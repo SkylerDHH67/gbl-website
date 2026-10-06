@@ -71,7 +71,7 @@
     if (!rows.length) { el.innerHTML = R.emptyBlock("No standings yet", "Standings appear once players have completed matches in this stage."); return; }
     el.innerHTML = '<div class="table-wrap"><table class="data-table"><thead><tr><th>#</th><th>Player</th><th class="num">W-L</th><th class="num">Rating</th></tr></thead><tbody>' +
       rows.map(function (r) {
-        return '<tr><td class="rank-cell">' + r.rank + '</td><td><a href="player.html?id=' + encodeURIComponent(r.playerId) + '">' + U.esc(r.displayName) + '</a></td>' +
+        return '<tr><td class="rank-cell' + (r.rank <= 3 ? " top" : "") + '">' + r.rank + '</td><td><a href="player.html?id=' + encodeURIComponent(r.playerId) + '">' + U.esc(r.displayName) + '</a></td>' +
           '<td class="num">' + r.wins + '-' + r.losses + '</td><td class="num">' + r.gblRating.toFixed(3) + '</td></tr>';
       }).join("") + "</tbody></table></div>";
   }
@@ -84,7 +84,7 @@
       .sort(function (a, b) { return b.gblRating - a.gblRating; }).slice(0, window.APP_CONFIG.HOME_LEADERS_COUNT);
     if (!top.length) { el.innerHTML = R.emptyBlock("No leaders yet", "Leaders appear once matches have been played."); return; }
     el.innerHTML = top.map(function (r, i) {
-      return '<div class="result-row"><span class="rank-cell">' + (i + 1) + '.</span> <a href="player.html?id=' + encodeURIComponent(r.playerId) + '">' + U.esc(r.displayName) + '</a>' +
+      return '<div class="result-row"><span class="rank-cell' + (i < 3 ? " top" : "") + '">' + (i + 1) + '.</span> <a href="player.html?id=' + encodeURIComponent(r.playerId) + '">' + U.esc(r.displayName) + '</a>' +
         '<span class="result-score">' + r.gblRating.toFixed(3) + '</span></div>';
     }).join("");
   }

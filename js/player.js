@@ -17,12 +17,16 @@
     var bestRating = rows.length ? Math.max.apply(null, rows.map(function (r) { return r.gblRating; })) : null;
 
     var avatar = player.badgeLogoUrl
-      ? '<img src="' + U.esc(player.badgeLogoUrl) + '" style="width:72px;height:72px;border-radius:50%;object-fit:cover;border:1px solid var(--line);" onerror="this.style.display=\'none\'">'
-      : '<div style="width:72px;height:72px;border-radius:50%;background:var(--bg-card);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;font-size:1.8rem;font-weight:700;">' + U.esc((player.displayName || "?").slice(0,1).toUpperCase()) + '</div>';
+      ? '<img src="' + U.esc(player.badgeLogoUrl) + '" style="width:120px;height:120px;border-radius:50%;object-fit:cover;border:2px solid var(--line);box-shadow:0 0 0 4px rgba(95,216,236,0.08);" onerror="this.style.display=\'none\'">'
+      : '<div style="width:120px;height:120px;border-radius:50%;background:var(--bg-card);border:2px solid var(--line);display:flex;align-items:center;justify-content:center;font-size:2.6rem;font-weight:700;">' + U.esc((player.displayName || "?").slice(0,1).toUpperCase()) + '</div>';
 
-    var html = '<div style="display:flex;gap:18px;align-items:center;flex-wrap:wrap;">' + avatar +
-      '<div><div class="eyebrow">' + U.esc(player.country || "") + '</div><h1 class="page-title">' + (player.flagEmoji ? U.esc(player.flagEmoji) + " " : "") + U.esc(player.displayName) + '</h1>' +
-      (player.bio ? '<p class="section-sub">' + U.esc(player.bio) + '</p>' : '') + '</div></div>';
+    var countryLine = (player.flagEmoji || player.country)
+      ? '<div class="subtle-country">' + (player.flagEmoji ? '<span class="flag">' + U.esc(player.flagEmoji) + '</span>' : '') + U.esc(player.country || "") + '</div>'
+      : '';
+
+    var html = '<div style="display:flex;gap:22px;align-items:center;flex-wrap:wrap;">' + avatar +
+      '<div><h1 class="page-title">' + U.esc(player.displayName) + '</h1>' + countryLine +
+      (player.bio ? '<p class="section-sub" style="margin-top:8px;">' + U.esc(player.bio) + '</p>' : '') + '</div></div>';
 
     html += '<div class="grid grid-4" style="margin-top:20px;">' +
       '<div class="stat-card"><div class="label">Record</div><div class="value">' + totalWins + '-' + totalLosses + '</div></div>' +

@@ -6,12 +6,16 @@
   function card(p, ratingByPlayer) {
     var rating = ratingByPlayer[p.playerId];
     var avatar = p.badgeLogoUrl
-      ? '<img class="player-avatar" style="width:44px;height:44px;" src="' + U.esc(p.badgeLogoUrl) + '" alt="" onerror="this.style.display=\'none\'">'
-      : '<div class="player-avatar" style="width:44px;height:44px;display:flex;align-items:center;justify-content:center;font-weight:700;">' + U.esc((p.displayName || "?").slice(0,1).toUpperCase()) + '</div>';
-    return '<a class="panel" style="display:flex;gap:12px;align-items:center;" href="player.html?id=' + encodeURIComponent(p.playerId) + '">' +
+      ? '<img class="player-avatar" style="width:64px;height:64px;" src="' + U.esc(p.badgeLogoUrl) + '" alt="" onerror="this.style.display=\'none\'">'
+      : '<div class="player-avatar" style="width:64px;height:64px;display:flex;align-items:center;justify-content:center;font-size:1.3rem;font-weight:700;">' + U.esc((p.displayName || "?").slice(0,1).toUpperCase()) + '</div>';
+    var countryLine = (p.flagEmoji || p.country)
+      ? '<div class="subtle-country">' + (p.flagEmoji ? '<span class="flag">' + U.esc(p.flagEmoji) + '</span>' : '') + U.esc(p.country || "") + '</div>'
+      : '';
+    return '<a class="panel" style="display:flex;gap:14px;align-items:center;" href="player.html?id=' + encodeURIComponent(p.playerId) + '">' +
       avatar +
-      '<div><div style="font-weight:700;">' + (p.flagEmoji ? U.esc(p.flagEmoji) + " " : "") + U.esc(p.displayName) + '</div>' +
-      '<div style="font-size:0.8rem;color:var(--text-dim);">' + U.esc(p.country || "") + (rating !== undefined ? ' · Rating ' + rating.toFixed(3) : "") + '</div></div></a>';
+      '<div><div style="font-weight:700;font-family:var(--display);font-size:1.05rem;">' + U.esc(p.displayName) + '</div>' +
+      countryLine +
+      (rating !== undefined ? '<div style="font-size:0.8rem;color:var(--text-dim);margin-top:3px;">Rating ' + rating.toFixed(3) + '</div>' : '') + '</div></a>';
   }
 
   function render(players, ratingByPlayer) {

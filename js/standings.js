@@ -32,7 +32,7 @@
     el.innerHTML = '<div class="table-wrap"><table class="data-table"><thead><tr>' +
       '<th>#</th><th>Player</th><th class="num">MP</th><th class="num">W-L</th><th class="num">Win%</th><th class="num">PF</th><th class="num">PA</th><th class="num">Diff</th><th>Last 10</th><th class="num">Elo</th><th class="num">GBL Rating</th>' +
       '</tr></thead><tbody>' + rows.map(function (r) {
-        return '<tr><td class="rank-cell">' + r.rank + '</td>' +
+        return '<tr><td class="rank-cell' + (r.rank <= 3 ? " top" : "") + '">' + r.rank + '</td>' +
           '<td><a href="player.html?id=' + encodeURIComponent(r.playerId) + '">' + U.esc(r.displayName) + '</a></td>' +
           '<td class="num">' + r.matchesPlayed + '</td><td class="num">' + r.wins + '-' + r.losses + '</td><td class="num">' + U.pct(r.winPct) + '</td>' +
           '<td class="num">' + r.pointsFor + '</td><td class="num">' + r.pointsAgainst + '</td><td class="num">' + (r.pointDiff > 0 ? "+" : "") + r.pointDiff + '</td>' +
