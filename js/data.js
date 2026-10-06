@@ -15,6 +15,53 @@
   "use strict";
   var U = window.APP_UTILS;
 
+  // Every real field name used anywhere across every GBL feed, confirmed
+  // directly against the live Master/Display sheets. Several source tabs
+  // (Match Database, Battle Event Log, Schedule, Standings, Reshuffle Log)
+  // have a header cell that's a single Sheets cell with embedded line
+  // breaks - title, description, the real field name, and sometimes a
+  // placeholder note, all stacked inside ONE cell - rather than the clean
+  // single-line header the newer feed_* tabs use. Rather than requiring
+  // every one of those cells to be hand-edited in the Sheet, each header
+  // cell is searched against this whitelist for a known field name
+  // anywhere inside it. Longest names first so "matches_played" is found
+  // whole rather than a shorter name matching part of it first (word
+  // boundaries already prevent that, but order is kept defensive).
+  var KNOWN_FIELD_NAMES = [
+    "player_a_new_order", "player_b_new_order", "paired_points_per_battle",
+    "baseline_points_per_battle", "participation_progress", "deck_a_build_ids",
+    "deck_b_build_ids", "position_in_rotation", "insufficient_sample",
+    "wordmark_logo_url", "target_score_override", "teammate_build_id",
+    "finish_distribution", "points_per_battle", "debut_season_id",
+    "badge_logo_url", "points_against", "duration_battles", "deck_build_ids",
+    "deck_net_rating", "winner_player_id", "player_a_id", "player_b_id",
+    "build_id_a", "build_id_b", "score_a_after", "score_b_after",
+    "matches_played", "synergy_delta", "shared_battles", "final_score_a",
+    "final_score_b", "reshuffle_id", "rotation_seq", "finish_type",
+    "points_awarded", "flag_emoji", "short_code", "display_name",
+    "points_scored", "win_rate", "win_pct", "points_for", "point_diff",
+    "times_used", "times_won", "battle_seq", "stage_id", "season_id",
+    "match_id", "event_id", "build_id", "player_id", "part_id", "item_id",
+    "is_voided", "voided_at", "is_redo", "timestamp", "last_10", "notes",
+    "image_url", "category", "country", "status", "active", "wins",
+    "losses", "elo", "gbl_rating", "rank", "date", "seq", "key", "value",
+    "type", "title", "url", "description", "system", "bio", "xWins",
+    "yWins", "matches", "playerX", "playerY", "target_score"
+  ];
+
+  function cleanHeaderCell_(raw) {
+    var s = String(raw == null ? "" : raw).trim();
+    if (!s) return s;
+    // Already a clean single token - nothing to extract.
+    if (/^[A-Za-z_][A-Za-z0-9_]*$/.test(s)) return s;
+    for (var i = 0; i < KNOWN_FIELD_NAMES.length; i++) {
+      var name = KNOWN_FIELD_NAMES[i];
+      var re = new RegExp("\\b" + name + "\\b");
+      if (re.test(s)) return name;
+    }
+    return s; // unknown/forward-compatible column - leave as-is
+  }
+
   // Detects which row is the real header row instead of assuming a fixed
   // offset. Script-built feed_* tabs have 3 rows before data (title,
   // description, headers - header row at index 2). Tabs imported straight
@@ -24,12 +71,13 @@
   // header AND the first data row, then treats the second data row as
   // headers - every raw.field_name lookup comes back undefined after that.
   // A header row is identified as the first row with at least 2 non-empty
-  // cells where most of them look like clean field names (letters/digits/
-  // underscore, no spaces or punctuation) rather than a title/sentence.
+  // cells where most of them look like clean field names OR contain a
+  // known field name somewhere inside them (see cleanHeaderCell_ above).
   function looksLikeHeaderCell_(cell) {
     var s = String(cell == null ? "" : cell).trim();
     if (!s) return true; // blank cells never disqualify a header row
-    return /^[A-Za-z_][A-Za-z0-9_]*$/.test(s);
+    if (/^[A-Za-z_][A-Za-z0-9_]*$/.test(s)) return true;
+    return cleanHeaderCell_(s) !== s; // matched a known field name inside messy text
   }
 
   function findHeaderRowIndex_(rows) {
@@ -58,7 +106,9 @@
         }
         var allRows = U.parseCSV(text);
         var headerIdx = findHeaderRowIndex_(allRows);
-        return U.rowsToObjects(allRows.slice(headerIdx));
+        var cleaned = allRows.slice(headerIdx);
+        if (cleaned.length) cleaned[0] = cleaned[0].map(cleanHeaderCell_);
+        return U.rowsToObjects(cleaned);
       });
     });
   }
