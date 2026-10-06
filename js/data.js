@@ -15,6 +15,35 @@
   "use strict";
   var U = window.APP_UTILS;
 
+  // Detects which row is the real header row instead of assuming a fixed
+  // offset. Script-built feed_* tabs have 3 rows before data (title,
+  // description, headers - header row at index 2). Tabs imported straight
+  // from a raw source tab (Match Database, Battle Event Log, Schedule,
+  // Standings, Reshuffle Log, etc. via IMPORTRANGE) only ever had ONE
+  // header row to begin with, so assuming index 2 silently skips the real
+  // header AND the first data row, then treats the second data row as
+  // headers - every raw.field_name lookup comes back undefined after that.
+  // A header row is identified as the first row with at least 2 non-empty
+  // cells where most of them look like clean field names (letters/digits/
+  // underscore, no spaces or punctuation) rather than a title/sentence.
+  function looksLikeHeaderCell_(cell) {
+    var s = String(cell == null ? "" : cell).trim();
+    if (!s) return true; // blank cells never disqualify a header row
+    return /^[A-Za-z_][A-Za-z0-9_]*$/.test(s);
+  }
+
+  function findHeaderRowIndex_(rows) {
+    var scanLimit = Math.min(rows.length, 6);
+    for (var i = 0; i < scanLimit; i++) {
+      var row = rows[i] || [];
+      var nonEmpty = row.filter(function (c) { return String(c == null ? "" : c).trim(); });
+      if (nonEmpty.length < 2) continue; // title/description rows are usually a single cell
+      var cleanCount = nonEmpty.filter(looksLikeHeaderCell_).length;
+      if (cleanCount / nonEmpty.length >= 0.6) return i;
+    }
+    return 2; // fallback: old fixed 3-row convention
+  }
+
   function fetchCSV(url) {
     if (U.isBlank(url)) return Promise.reject(Object.assign(new Error("MISSING_FEED_URL"), { code: "MISSING_FEED_URL" }));
     var bust = url + (url.indexOf("?") !== -1 ? "&" : "?") + "_=" + Date.now();
@@ -27,10 +56,9 @@
           err.url = url;
           throw err;
         }
-        // GBL feed tabs always have 3 header rows (title, description,
-        // column headers) before data - skip the first 2 so rowsToObjects
-        // treats the real column-header row as headers, not the title row.
-        return U.rowsToObjects(U.parseCSV(text).slice(2));
+        var allRows = U.parseCSV(text);
+        var headerIdx = findHeaderRowIndex_(allRows);
+        return U.rowsToObjects(allRows.slice(headerIdx));
       });
     });
   }
