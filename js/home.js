@@ -3,9 +3,6 @@
   var U = window.APP_UTILS, R = window.APP_RENDER;
 
   function pickCurrentStage(data) {
-    // "Current stage" = whichever stage has the most recent match activity.
-    // Falls back to the highest-order stage of an active season if there's
-    // no match data yet (a season that's just starting).
     var lastDateByStage = {};
     data.matches.forEach(function (m) {
       var t = new Date(m.date).getTime();
@@ -76,16 +73,28 @@
       }).join("") + "</tbody></table></div>";
   }
 
+  // League leaders is build-centric, not player-centric: ranks by win rate
+  // among builds with enough battles to mean something (MIN_SAMPLE), same
+  // statistical-integrity principle used everywhere else on this site -
+  // a 1-0 build never outranks a proven one just because 100% > 90%.
+  var BUILD_LEADER_MIN_SAMPLE = 3;
+
   function renderLeaders(data) {
     var el = document.getElementById("home-leaders");
-    if (!data.meta.standings.ok) { el.innerHTML = R.errorBlock(data.meta.standings.error, "feed_standings"); return; }
-    if (!data.standings.length) { el.innerHTML = R.emptyBlock("No leaders yet"); return; }
-    var top = data.standings.filter(function (s) { return s.matchesPlayed > 0; })
-      .sort(function (a, b) { return b.gblRating - a.gblRating; }).slice(0, window.APP_CONFIG.HOME_LEADERS_COUNT);
-    if (!top.length) { el.innerHTML = R.emptyBlock("No leaders yet", "Leaders appear once matches have been played."); return; }
+    if (!data.meta.buildStats.ok) { el.innerHTML = R.errorBlock(data.meta.buildStats.error, "feed_build_stats"); return; }
+    var qualified = data.buildStats.filter(function (b) { return b.timesUsed >= BUILD_LEADER_MIN_SAMPLE; });
+    if (!qualified.length) {
+      el.innerHTML = R.emptyBlock("No qualified builds yet", "A build needs at least " + BUILD_LEADER_MIN_SAMPLE + " battles before it shows up here.");
+      return;
+    }
+    var top = qualified.sort(function (a, b) { return b.winRate - a.winRate || b.timesUsed - a.timesUsed; })
+      .slice(0, window.APP_CONFIG.HOME_LEADERS_COUNT);
+    var lookup = R.playerLookup(data.players);
     el.innerHTML = top.map(function (r, i) {
-      return '<div class="result-row"><span class="rank-cell' + (i < 3 ? " top" : "") + '">' + (i + 1) + '.</span> <a href="player.html?id=' + encodeURIComponent(r.playerId) + '">' + U.esc(r.displayName) + '</a>' +
-        '<span class="result-score">' + r.gblRating.toFixed(3) + '</span></div>';
+      var pilot = lookup(r.playerId);
+      return '<div class="result-row"><span class="rank-cell' + (i < 3 ? " top" : "") + '">' + (i + 1) + '.</span> ' +
+        '<span><span style="font-family:var(--data);font-weight:700;">' + U.esc(r.buildId) + '</span> <span style="color:var(--text-faint);font-size:0.82rem;">— ' + U.esc(pilot.displayName) + '</span></span>' +
+        '<span class="result-score">' + U.pct(r.winRate) + '<span style="color:var(--text-faint);font-weight:400;font-size:0.78rem;"> (' + r.timesUsed + ')</span></span></div>';
     }).join("");
   }
 

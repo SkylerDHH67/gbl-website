@@ -293,7 +293,7 @@ select, input[type="text"], input[type="search"]{
 .hero{ padding: 44px 0 32px; border-bottom: 1px solid var(--line); position: relative; }
 .hero .eyebrow{ margin-bottom: 10px; }
 
-.hero-brand{ display:flex; align-items:center; gap: 28px; position: relative; overflow: hidden; }
+.hero-brand{ display:flex; align-items:center; gap: 28px; position: relative; }
 .hero-crest-wrap{
   position: relative; flex-shrink: 0;
   width: 168px; height: 168px;
