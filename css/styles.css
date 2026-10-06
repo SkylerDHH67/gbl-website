@@ -1,28 +1,32 @@
 /* =========================================================
    GLOBAL BLADE LEAGUE — public site
-   Design system: dark arena, precise sports-data hierarchy, one
-   controlled accent (arc-blue) plus a hot spin-orange used sparingly
-   for "live"/energy moments only. No glassmorphism, no stacked
-   gradients, no decorative clutter - readability and information
-   hierarchy come first. Mobile-first throughout.
+   Design system: black/grey arena with two controlled accents -
+   ice blue (primary: links/active states/ratings) and red (used
+   for "live"/energy moments and losses), plus yellow reserved for
+   standout highlights (leaders, featured builds, callouts). No
+   glassmorphism, no stacked gradients, no decorative clutter -
+   readability and information hierarchy come first. Mobile-first
+   throughout.
    ========================================================= */
 
 :root{
-  --bg: #0a0d12;
-  --bg-elevated: #10141b;
-  --bg-card: #141920;
-  --line: #232a35;
-  --line-soft: #1a1f28;
-  --text: #eef1f5;
-  --text-dim: #a7b0bd;
-  --text-faint: #6b7483;
+  --bg: #0a0b0d;
+  --bg-elevated: #15171b;
+  --bg-card: #1b1e22;
+  --line: #2a2d32;
+  --line-soft: #202327;
+  --text: #f2f3f5;
+  --text-dim: #a8acb3;
+  --text-faint: #6e737b;
 
-  --arc: #4da3ff;         /* primary accent - "arc blue", used for links/active states/ratings */
-  --arc-bright: #7cc0ff;
-  --spin: #ff7a3d;        /* secondary accent - "spin orange", used ONLY for live/energy moments */
-  --spin-bright: #ff9a66;
-  --win: #35c987;
-  --loss: #e5566b;
+  --arc: #5fd8ec;         /* primary accent - "ice blue", used for links/active states/ratings */
+  --arc-bright: #9aecf8;
+  --spin: #ef3e4a;        /* secondary accent - "GBL red", used for live/energy moments + losses */
+  --spin-bright: #ff6b74;
+  --gold: #ffc53d;        /* brand yellow - reserved for standout highlights (leaders, featured, stars) */
+  --gold-bright: #ffd873;
+  --win: var(--gold);
+  --loss: var(--spin);
 
   --radius: 12px;
   --radius-sm: 7px;
@@ -50,8 +54,8 @@ body::before{
   z-index: -1;
   pointer-events: none;
   background:
-    radial-gradient(circle at 15% -10%, rgba(77,163,255,0.10), transparent 40%),
-    radial-gradient(circle at 100% 10%, rgba(255,122,61,0.06), transparent 38%);
+    radial-gradient(circle at 15% -10%, rgba(95,216,236,0.10), transparent 40%),
+    radial-gradient(circle at 100% 10%, rgba(239,62,74,0.06), transparent 38%);
 }
 a{ color: inherit; text-decoration: none; }
 button{ font-family: inherit; cursor: pointer; }
@@ -89,7 +93,7 @@ nav.main-nav a{
   transition: background 0.15s, color 0.15s;
 }
 nav.main-nav a:hover{ background: var(--bg-card); color: var(--text); }
-nav.main-nav a.active{ color: var(--arc-bright); background: rgba(77,163,255,0.10); }
+nav.main-nav a.active{ color: var(--arc-bright); background: rgba(95,216,236,0.10); }
 
 .nav-toggle{ display:none; background:none; border:1px solid var(--line); border-radius: var(--radius-sm); color: var(--text); padding: 8px 10px; }
 
@@ -135,7 +139,7 @@ h2.section-title{ font-family: var(--display); font-size: 1.3rem; margin: 0 0 14
 .stat-card .sub{ font-size: 0.8rem; color: var(--text-dim); margin-top: 4px; }
 
 .badge{ display:inline-flex; align-items:center; gap:5px; font-family: var(--data); font-size: 0.7rem; padding: 3px 9px; border-radius: 99px; background: var(--bg-elevated); border: 1px solid var(--line); color: var(--text-dim); }
-.badge.live{ color: var(--spin-bright); border-color: rgba(255,122,61,0.35); background: rgba(255,122,61,0.08); }
+.badge.live{ color: var(--spin-bright); border-color: rgba(239,62,74,0.35); background: rgba(239,62,74,0.08); }
 .badge.win{ color: var(--win); }
 .badge.loss{ color: var(--loss); }
 .badge .dot{ width:6px; height:6px; border-radius:50%; background: currentColor; }
@@ -183,7 +187,7 @@ td.num, th.num{ text-align:right; font-family: var(--data); }
 .btn.primary{ background: var(--arc); border-color: var(--arc); color: #06121f; }
 .filter-bar{ display:flex; flex-wrap:wrap; gap: 8px; margin-bottom: 18px; }
 .chip{ padding: 6px 12px; border-radius: 99px; border:1px solid var(--line); background: var(--bg-card); color: var(--text-dim); font-size: 0.8rem; font-weight:600; }
-.chip.active{ background: rgba(77,163,255,0.12); border-color: var(--arc); color: var(--arc-bright); }
+.chip.active{ background: rgba(95,216,236,0.12); border-color: var(--arc); color: var(--arc-bright); }
 select, input[type="text"], input[type="search"]{
   background: var(--bg-card); border:1px solid var(--line); color: var(--text); border-radius: var(--radius-sm); padding: 8px 10px; font-size: 0.85rem;
 }
