@@ -104,7 +104,7 @@
         var oppScore = isA ? m.finalScoreB : m.finalScoreA;
         var opp = lookup(isA ? m.playerBId : m.playerAId);
         var won = m.winnerPlayerId === playerId;
-        var href = 'match-center.html?id=' + encodeURIComponent(m.matchId);
+        var href = 'match.html?id=' + encodeURIComponent(m.matchId);
         // Opponent cell links to their profile; the rest link to the match
         // center. Kept as separate <a> tags per cell (not one <a> wrapping
         // the whole <tr>, which the HTML table parser doesn't allow) and

@@ -2,6 +2,7 @@
   "use strict";
   var U = window.APP_UTILS, R = window.APP_RENDER;
   var filter = "all";
+  var playerFilterId = "";
 
   // Completed matches come from feed_matches - the Battle Event Log /
   // Match Database pipeline, fully automated from the scorekeeper tool.
@@ -13,7 +14,7 @@
   // Dates on manual rows are free text ("TBD" is fine) rather than a
   // real timestamp, so manual rows can't be reliably date-sorted against
   // completed ones - they're always shown above completed matches instead.
-  function combinedRows(data) {
+  function combinedRows(data, byName) {
     var completed = data.matches.map(function (m) {
       return {
         isManual: false, matchId: m.matchId, date: m.date, status: m.status,
@@ -21,11 +22,17 @@
         playerAId: m.playerAId, playerBId: m.playerBId
       };
     });
+    // Manual "Upcoming Matches" rows are hand-typed names with no
+    // player_id by design (see note above) - resolved against the real
+    // Players list here ONLY so the player filter below can match them too;
+    // nothing else about how these rows render depends on the match.
     var upcoming = data.upcoming.map(function (u) {
+      var manA = byName(u.playerAName), manB = byName(u.playerBName);
       return {
         isManual: true, matchId: null, date: u.date, status: "SCHEDULED",
         scoreA: null, scoreB: null,
-        playerAName: u.playerAName, playerBName: u.playerBName, note: u.note
+        playerAName: u.playerAName, playerBName: u.playerBName, note: u.note,
+        playerAId: manA ? manA.playerId : null, playerBId: manB ? manB.playerId : null
       };
     });
     return { completed: completed, upcoming: upcoming };
@@ -33,13 +40,17 @@
 
   function render(data, lookup) {
     var el = document.getElementById("matches-table");
-    var rows = combinedRows(data);
     var byName = R.playerLookupByName(data.players);
+    var rows = combinedRows(data, byName);
     var all = [];
     if (filter !== "completed") all = all.concat(rows.upcoming);
     if (filter !== "upcoming") all = all.concat(rows.completed.sort(function (a, b) { return new Date(b.date) - new Date(a.date); }));
 
-    if (!all.length) { el.innerHTML = R.emptyBlock("No matches to show", "Try a different filter, or check back once matches are scheduled."); return; }
+    if (playerFilterId) {
+      all = all.filter(function (r) { return r.playerAId === playerFilterId || r.playerBId === playerFilterId; });
+    }
+
+    if (!all.length) { el.innerHTML = R.emptyBlock("No matches to show", playerFilterId ? "This player has no matches under the current filter." : "Try a different filter, or check back once matches are scheduled."); return; }
     el.innerHTML = '<div class="table-wrap"><table class="data-table"><thead><tr><th>Date</th><th>Matchup</th><th class="num">Score</th><th>Status</th></tr></thead><tbody>' +
       all.map(function (r) {
         var matchup, score = (r.scoreA === null || r.scoreA === undefined) ? "—" : (r.scoreA + "–" + r.scoreB);
@@ -72,6 +83,18 @@
         filter = btn.getAttribute("data-filter");
         render(data, lookup);
       });
+    });
+
+    var playerSelect = document.getElementById("sched-player-filter");
+    data.players.slice().sort(function (a, b) { return a.displayName.localeCompare(b.displayName); }).forEach(function (p) {
+      var opt = document.createElement("option");
+      opt.value = p.playerId;
+      opt.textContent = p.displayName;
+      playerSelect.appendChild(opt);
+    });
+    playerSelect.addEventListener("change", function (e) {
+      playerFilterId = e.target.value;
+      render(data, lookup);
     });
   }).catch(function (err) {
     document.getElementById("matches-table").innerHTML = R.errorBlock(err && err.code, "a data feed");

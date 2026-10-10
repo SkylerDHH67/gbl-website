@@ -160,7 +160,22 @@
     return '<div class="flow-bar" style="margin-top:14px;">' + segs + '</div>';
   }
 
-  function renderBattleLog(timeline, lookup, buildsById, partsById) {
+  // "Spin Finish for Technicolor Sky with Shelter Drake / 7-60 / Rush" -
+  // reads as a sentence rather than making someone cross-reference which
+  // side's build won. Falls back gracefully if winnerPlayerId doesn't
+  // match either side (shouldn't happen, but never crash the log over it).
+  function battleSentenceHTML(e, match, lookup, buildsById, partsById) {
+    var aWon = e.winnerPlayerId === match.playerAId;
+    var winner = lookup(e.winnerPlayerId);
+    var winnerBuildId = aWon ? e.buildIdA : e.buildIdB;
+    var loserBuildId = aWon ? e.buildIdB : e.buildIdA;
+    return '<span style="flex:1;min-width:0;">' +
+      '<span>' + U.esc(finishLabel(e.finishType)) + ' for <strong>' + U.esc(winner.displayName) + '</strong> with ' + U.esc(buildLabel(winnerBuildId, buildsById, partsById)) + '</span>' +
+      '<span style="display:block;color:var(--text-faint);font-size:0.78rem;margin-top:1px;">vs ' + U.esc(buildLabel(loserBuildId, buildsById, partsById)) + '</span>' +
+      '</span>';
+  }
+
+  function renderBattleLog(timeline, match, lookup, buildsById, partsById) {
     var el = document.getElementById("mc-battle-log");
     if (!timeline.length) { el.innerHTML = R.emptyBlock("No battle events recorded for this match"); return; }
     var html = '<div class="panel" style="padding:0;">';
@@ -175,9 +190,9 @@
         html += '<div class="battle-row redo"><span class="seq">–</span><span>Redo — ' + U.esc(finishLabel(e.finishType)) + '</span></div>';
         return;
       }
-      html += '<div class="battle-row"><span class="seq">' + (e.battleSeq !== null ? e.battleSeq : "") + '</span>' +
-        '<span class="finish-tag">' + U.esc(finishLabel(e.finishType)) + '</span>' +
-        '<span style="flex:1;">' + U.esc(buildLabel(e.buildIdA, buildsById, partsById)) + ' <span style="color:var(--text-faint)">vs</span> ' + U.esc(buildLabel(e.buildIdB, buildsById, partsById)) + '</span>' +
+      html += '<div class="battle-row">' +
+        '<span class="seq">' + (e.battleSeq !== null ? e.battleSeq : "") + '</span>' +
+        battleSentenceHTML(e, match, lookup, buildsById, partsById) +
         '<span style="font-family:var(--data);font-weight:700;">' + e.scoreAAfter + '–' + e.scoreBAfter + '</span></div>';
     });
     html += "</div>";
@@ -215,12 +230,12 @@
       }).join("") + "</tbody></table></div>";
   }
 
-  function renderFlow(timeline, match) {
+  function renderFlow(timeline, match, lookup, buildsById, partsById) {
     var el = document.getElementById("mc-flow");
     var realBattles = timeline.filter(function (e) { return e.kind === "battle" && !e.isRedo; });
     if (!realBattles.length) { el.innerHTML = R.emptyBlock("No battles recorded yet"); return; }
     var rows = realBattles.map(function (e, i) {
-      return '<div class="result-row"><span>Battle ' + (i + 1) + ' — ' + U.esc(finishLabel(e.finishType)) + '</span><span class="result-score">' + e.scoreAAfter + '–' + e.scoreBAfter + '</span></div>';
+      return '<div class="result-row"><span style="display:flex;gap:8px;align-items:baseline;"><span style="color:var(--text-faint);">Battle ' + (i + 1) + '</span>' + battleSentenceHTML(e, match, lookup, buildsById, partsById) + '</span><span class="result-score">' + e.scoreAAfter + '–' + e.scoreBAfter + '</span></div>';
     }).join("");
     el.innerHTML = '<div class="panel">' + renderFlowBarHTML(realBattles, match) +
       '<p style="color:var(--text-dim);font-size:0.85rem;margin:14px 0 6px;">Each segment above is one battle, sized by points awarded and colored by winner — read left to right for how the match unfolded.</p>' +
@@ -255,10 +270,10 @@
 
     renderHeader(match, lookup);
     renderSummary(match, lookup, timeline);
-    renderBattleLog(timeline, lookup, buildsById, partsById);
+    renderBattleLog(timeline, match, lookup, buildsById, partsById);
     renderBuilds(decksAndBox, decksAndBox.box, match, buildsById, partsById);
     renderStats(decksAndBox.box, buildsById, partsById);
-    renderFlow(timeline, match);
+    renderFlow(timeline, match, lookup, buildsById, partsById);
     wireTabs();
   }).catch(function (err) {
     document.getElementById("mc-header").innerHTML = R.errorBlock(err && err.code, "a data feed");
