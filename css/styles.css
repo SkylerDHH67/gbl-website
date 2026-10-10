@@ -278,8 +278,21 @@ td.num, th.num{ text-align:right; font-family: var(--data); }
 .matchup-faces{ display:flex; align-items:center; gap:7px; }
 .matchup-faces .player-logo{ width:24px; height:24px; min-width:24px; }
 
-.build-cell{ display:flex; align-items:center; gap:9px; }
+.build-cell{ display:flex; align-items:center; gap:9px; min-height:30px; }
 .blade-thumb{ width:30px; height:30px; min-width:30px; border-radius:6px; object-fit:cover; background: var(--bg-elevated); border:1px solid var(--line); flex-shrink:0; }
+.blade-thumb-placeholder{ width:30px; height:30px; min-width:30px; flex-shrink:0; }
+
+/* Right-aligned numeric cell with an optional small badge to the left of
+   the number (e.g. "n<5" sample-size flag). Using flex here instead of
+   plain text-align keeps the number itself pinned flush right with a
+   consistent gap, so it lines up vertically down the column whether or
+   not a given row's badge is present - that inconsistency was the
+   original cause of the Used/Won columns looking misaligned. */
+.num-cell{ display:inline-flex; align-items:center; justify-content:flex-end; gap:6px; width:100%; }
+
+table.data-table th.sortable{ cursor:pointer; user-select:none; }
+table.data-table th.sortable:hover{ color: var(--text-dim); }
+table.data-table th.sortable .sort-arrow{ margin-left:4px; opacity:0.6; }
 
 /* ---------------------------------------------------------
    States: loading / error / empty
