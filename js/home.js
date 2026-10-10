@@ -47,9 +47,13 @@
   }
 
   // Sourced from feed_media (Site Content tab): a row with type "youtube"
-  // (preferred) or a social_link row whose title mentions YouTube. Admin
-  // adds/updates the URL in the Sheet - no code change needed. Hidden
-  // entirely if no such row exists yet, rather than showing a dead link.
+  // (preferred) or a social_link row whose title mentions YouTube. Only the
+  // URL comes from the Sheet - the headline/subtext are fixed marketing
+  // copy here, not pulled from the row's own title/description fields
+  // (those are meant for the footer's social-link list, which is why a
+  // placeholder like "TBD" in the description column was leaking into this
+  // card before). Hidden entirely if no such row exists yet, rather than
+  // showing a dead link.
   function renderYoutubeCallout(data) {
     var el = document.getElementById("hero-youtube");
     if (!el || !data.meta.media.ok) return;
@@ -57,8 +61,6 @@
       data.media.filter(function (m) { return String(m.type).toLowerCase() === "social_link" && /youtube/i.test(m.title); })[0];
     if (!row || !row.url) return;
     el.href = row.url;
-    if (row.title) el.querySelector(".yt-title").textContent = row.title;
-    if (row.description) el.querySelector(".yt-sub").textContent = row.description;
     el.style.display = "flex";
   }
 
