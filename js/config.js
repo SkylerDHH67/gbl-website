@@ -32,11 +32,20 @@ window.APP_CONFIG = {
   // One entry per feed_* tab in the Display Sheet. Add a tab here the
   // moment you create it on Master/Display - everything downstream
   // (data.js, any page) references these keys, never a raw URL.
+  //
+  // SCHEDULE vs UPCOMING: SCHEDULE mirrors Master's "Schedule" tab, which
+  // the Live Match Engine reads from to start a match - it's not used for
+  // the public upcoming-matches display anymore. UPCOMING mirrors a
+  // separate, fully manual "Upcoming Matches" tab on Master that the
+  // league admin hand-edits purely for public preview (subject to change,
+  // no player_id/stage_id foreign keys required). Keeping these decoupled
+  // means editing tomorrow's hype list never touches live match setup.
   FEED_TABS: {
     PLAYERS: "feed_players",
     PARTS_CATALOG: "feed_parts_catalog",
     CONFIG: "feed_config",
     SCHEDULE: "feed_schedule",
+    UPCOMING: "feed_upcoming",
     MATCHES: "feed_matches",
     BATTLE_LOG: "feed_battle_log",
     RESHUFFLE_LOG: "feed_reshuffle_log",

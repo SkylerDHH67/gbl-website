@@ -44,20 +44,18 @@
     }).join("");
   }
 
-  function renderUpcoming(data, lookup) {
+  // Sourced from the manual "Upcoming Matches" tab (feed_upcoming), not
+  // the live-match-engine Schedule tab - purely a hand-edited preview, so
+  // names are plain text and there's no real date to sort by. Sheet row
+  // order is treated as the admin's intended display order.
+  function renderUpcoming(data) {
     var el = document.getElementById("home-upcoming");
-    if (!data.meta.schedule.ok) { el.innerHTML = R.errorBlock(data.meta.schedule.error, "feed_schedule"); return; }
-    var upcoming = data.schedule.filter(function (m) { return String(m.status).toUpperCase() !== "COMPLETE" && String(m.status).toUpperCase() !== "CANCELLED"; })
-      .sort(function (a, b) {
-        var da = a.date ? new Date(a.date).getTime() : Infinity, db = b.date ? new Date(b.date).getTime() : Infinity;
-        return da - db;
-      })
-      .slice(0, window.APP_CONFIG.HOME_SCHEDULE_COUNT);
-    if (!upcoming.length) { el.innerHTML = R.emptyBlock("Nothing scheduled right now", "Check back once new matches are set up."); return; }
+    if (!data.meta.upcoming.ok) { el.innerHTML = R.errorBlock(data.meta.upcoming.error, "feed_upcoming"); return; }
+    var upcoming = data.upcoming.slice(0, window.APP_CONFIG.HOME_SCHEDULE_COUNT);
+    if (!upcoming.length) { el.innerHTML = R.emptyBlock("Nothing scheduled right now", "Check back once new matches are added to the Upcoming Matches tab."); return; }
     el.innerHTML = upcoming.map(function (m) {
-      var a = lookup(m.playerAId), b = lookup(m.playerBId);
-      return '<div class="result-row"><span>' + U.esc(a.displayName) + ' <span style="color:var(--text-faint)">vs</span> ' + U.esc(b.displayName) + '</span>' +
-        '<span class="badge">' + U.fmtDateShort(m.date) + '</span></div>';
+      return '<div class="result-row"><span>' + U.esc(m.playerAName) + ' <span style="color:var(--text-faint)">vs</span> ' + U.esc(m.playerBName) + '</span>' +
+        '<span class="badge">' + U.esc(m.date || "TBD") + '</span></div>';
     }).join("");
   }
 
@@ -103,7 +101,7 @@
     var currentStageId = pickCurrentStage(data);
     renderHero(data, currentStageId);
     renderResults(data, lookup);
-    renderUpcoming(data, lookup);
+    renderUpcoming(data);
     renderStandingsSnapshot(data, currentStageId);
     renderLeaders(data);
   }).catch(function (err) {

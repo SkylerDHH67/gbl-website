@@ -3,47 +3,61 @@
   var U = window.APP_UTILS, R = window.APP_RENDER;
   var filter = "all";
 
+  // Completed matches come from feed_matches - the Battle Event Log /
+  // Match Database pipeline, fully automated from the scorekeeper tool.
+  // Upcoming matches come from feed_upcoming - a separate, fully manual
+  // tab the league admin hand-edits purely for public preview. These are
+  // deliberately decoupled: feed_upcoming has no player_id/match_id
+  // foreign keys and isn't read by the Live Match Engine at all, so
+  // editing tomorrow's hype list can never affect a live match setup.
+  // Dates on manual rows are free text ("TBD" is fine) rather than a
+  // real timestamp, so manual rows can't be reliably date-sorted against
+  // completed ones - they're always shown above completed matches instead.
   function combinedRows(data) {
-    // Completed matches come from feed_matches (the source of truth for
-    // finished games); anything not yet finished comes from feed_schedule.
-    // A match_id present in both is shown once, preferring the completed
-    // Match Database version.
-    var completedIds = {};
-    var rows = data.matches.map(function (m) {
-      completedIds[m.matchId] = true;
-      return { matchId: m.matchId, seasonId: m.seasonId, stageId: m.stageId, playerAId: m.playerAId, playerBId: m.playerBId, date: m.date, status: m.status, scoreA: m.finalScoreA, scoreB: m.finalScoreB, winnerPlayerId: m.winnerPlayerId };
+    var completed = data.matches.map(function (m) {
+      return {
+        isManual: false, matchId: m.matchId, date: m.date, status: m.status,
+        scoreA: m.finalScoreA, scoreB: m.finalScoreB,
+        playerAId: m.playerAId, playerBId: m.playerBId
+      };
     });
-    data.schedule.forEach(function (m) {
-      if (completedIds[m.matchId]) return;
-      rows.push({ matchId: m.matchId, seasonId: m.seasonId, stageId: m.stageId, playerAId: m.playerAId, playerBId: m.playerBId, date: m.date, status: m.status, scoreA: null, scoreB: null, winnerPlayerId: null });
+    var upcoming = data.upcoming.map(function (u) {
+      return {
+        isManual: true, matchId: null, date: u.date, status: "SCHEDULED",
+        scoreA: null, scoreB: null,
+        playerAName: u.playerAName, playerBName: u.playerBName, note: u.note
+      };
     });
-    return rows;
+    return { completed: completed, upcoming: upcoming };
   }
 
   function render(data, lookup) {
     var el = document.getElementById("matches-table");
     var rows = combinedRows(data);
-    if (filter === "completed") rows = rows.filter(function (r) { return r.status === "COMPLETE"; });
-    if (filter === "upcoming") rows = rows.filter(function (r) { return r.status !== "COMPLETE"; });
-    rows.sort(function (a, b) {
-      var da = a.date ? new Date(a.date).getTime() : Infinity, db = b.date ? new Date(b.date).getTime() : Infinity;
-      return db - da; // most recent/soonest-unknown first isn't ideal for a mixed list, but recency-first reads naturally for a combined feed
-    });
-    if (!rows.length) { el.innerHTML = R.emptyBlock("No matches to show", "Try a different filter, or check back once matches are scheduled."); return; }
+    var all = [];
+    if (filter !== "completed") all = all.concat(rows.upcoming);
+    if (filter !== "upcoming") all = all.concat(rows.completed.sort(function (a, b) { return new Date(b.date) - new Date(a.date); }));
+
+    if (!all.length) { el.innerHTML = R.emptyBlock("No matches to show", "Try a different filter, or check back once matches are scheduled."); return; }
     el.innerHTML = '<div class="table-wrap"><table class="data-table"><thead><tr><th>Date</th><th>Matchup</th><th class="num">Score</th><th>Status</th></tr></thead><tbody>' +
-      rows.map(function (r) {
-        var a = lookup(r.playerAId), b = lookup(r.playerBId);
-        var score = (r.scoreA === null || r.scoreA === undefined) ? "—" : (r.scoreA + "–" + r.scoreB);
-        var matchup = U.esc(a.displayName) + ' <span style="color:var(--text-faint)">vs</span> ' + U.esc(b.displayName);
-        var link = r.status === "COMPLETE" ? '<a href="match.html?id=' + encodeURIComponent(r.matchId) + '">' + matchup + "</a>" : matchup;
-        return "<tr><td>" + U.fmtDate(r.date) + "</td><td>" + link + '</td><td class="num">' + score + "</td><td>" + R.statusBadge(r.status) + "</td></tr>";
+      all.map(function (r) {
+        var matchup, score = (r.scoreA === null || r.scoreA === undefined) ? "—" : (r.scoreA + "–" + r.scoreB);
+        if (r.isManual) {
+          matchup = U.esc(r.playerAName) + ' <span style="color:var(--text-faint)">vs</span> ' + U.esc(r.playerBName) +
+            (r.note ? '<div style="font-size:0.78rem;color:var(--text-faint);font-style:italic;margin-top:2px;">' + U.esc(r.note) + "</div>" : "");
+        } else {
+          var a = lookup(r.playerAId), b = lookup(r.playerBId);
+          var plain = U.esc(a.displayName) + ' <span style="color:var(--text-faint)">vs</span> ' + U.esc(b.displayName);
+          matchup = r.status === "COMPLETE" ? '<a href="match.html?id=' + encodeURIComponent(r.matchId) + '">' + plain + "</a>" : plain;
+        }
+        return "<tr><td>" + (r.isManual ? U.esc(r.date || "TBD") : U.fmtDate(r.date)) + "</td><td>" + matchup + '</td><td class="num">' + score + "</td><td>" + R.statusBadge(r.status) + "</td></tr>";
       }).join("") + "</tbody></table></div>";
   }
 
   window.APP_DATA.loadAppData().then(function (data) {
     var lookup = R.playerLookup(data.players);
-    if (!data.meta.matches.ok && !data.meta.schedule.ok) {
-      document.getElementById("matches-table").innerHTML = R.errorBlock(data.meta.matches.error, "feed_matches / feed_schedule");
+    if (!data.meta.matches.ok && !data.meta.upcoming.ok) {
+      document.getElementById("matches-table").innerHTML = R.errorBlock(data.meta.matches.error, "feed_matches / feed_upcoming");
       return;
     }
     render(data, lookup);

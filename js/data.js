@@ -179,6 +179,17 @@
     };
   }
 
+  // The manual "Upcoming Matches" tab has no player_id/stage_id foreign
+  // keys by design - it's hand-edited purely for public preview, so names
+  // are plain text the admin typed in, not resolved against the Players
+  // tab. upcoming_id is just a stable row key, not a real match_id.
+  function normalizeUpcomingRow(raw) {
+    return {
+      upcomingId: raw.upcoming_id, date: raw.date || "", stageLabel: raw.stage_label || "",
+      playerAName: raw.player_a_name || "", playerBName: raw.player_b_name || "", note: raw.note || ""
+    };
+  }
+
   function normalizeMatchRow(raw) {
     return {
       matchId: raw.match_id, seasonId: raw.season_id, stageId: raw.stage_id,
@@ -282,16 +293,16 @@
   function loadAppData() {
     return Promise.all([
       fetchFeedSafe("PLAYERS"), fetchFeedSafe("PARTS_CATALOG"), fetchFeedSafe("CONFIG"),
-      fetchFeedSafe("SCHEDULE"), fetchFeedSafe("MATCHES"), fetchFeedSafe("BATTLE_LOG"),
+      fetchFeedSafe("SCHEDULE"), fetchFeedSafe("UPCOMING"), fetchFeedSafe("MATCHES"), fetchFeedSafe("BATTLE_LOG"),
       fetchFeedSafe("RESHUFFLE_LOG"), fetchFeedSafe("STANDINGS"), fetchFeedSafe("BUILD_STATS"),
       fetchFeedSafe("HEAD_TO_HEAD"), fetchFeedSafe("DECK_RECORDS"), fetchFeedSafe("BUILD_PAIR_SYNERGY"),
       fetchFeedSafe("STATS_LAB_SOURCE"), fetchFeedSafe("MEDIA")
     ]).then(function (results) {
       var r = {
-        players: results[0], parts: results[1], config: results[2], schedule: results[3], matches: results[4],
-        battleLog: results[5], reshuffleLog: results[6], standings: results[7], buildStats: results[8],
-        headToHead: results[9], deckRecords: results[10], buildPairSynergy: results[11],
-        statsLabSource: results[12], media: results[13]
+        players: results[0], parts: results[1], config: results[2], schedule: results[3], upcoming: results[4], matches: results[5],
+        battleLog: results[6], reshuffleLog: results[7], standings: results[8], buildStats: results[9],
+        headToHead: results[10], deckRecords: results[11], buildPairSynergy: results[12],
+        statsLabSource: results[13], media: results[14]
       };
       var configMaps = buildConfigMaps(r.config.rows);
       return {
@@ -300,6 +311,7 @@
           parts: { ok: r.parts.ok, error: r.parts.error },
           config: { ok: r.config.ok, error: r.config.error },
           schedule: { ok: r.schedule.ok, error: r.schedule.error },
+          upcoming: { ok: r.upcoming.ok, error: r.upcoming.error },
           matches: { ok: r.matches.ok, error: r.matches.error },
           battleLog: { ok: r.battleLog.ok, error: r.battleLog.error },
           reshuffleLog: { ok: r.reshuffleLog.ok, error: r.reshuffleLog.error },
@@ -316,6 +328,7 @@
         seasons: configMaps.seasons, seasonStatus: configMaps.seasonStatus, stages: configMaps.stages,
         finishPoints: configMaps.finishPoints, finishIsRedo: configMaps.finishIsRedo,
         schedule: r.schedule.rows.filter(function (m) { return m.match_id; }).map(normalizeScheduleRow),
+        upcoming: r.upcoming.rows.filter(function (u) { return u.player_a_name && u.player_b_name; }).map(normalizeUpcomingRow),
         matches: r.matches.rows.filter(function (m) { return m.match_id; }).map(normalizeMatchRow),
         battleLog: r.battleLog.rows.filter(function (e) { return e.event_id; }).map(normalizeBattleRow),
         reshuffleLog: r.reshuffleLog.rows.filter(function (e) { return e.reshuffle_id; }).map(normalizeReshuffleRow),
