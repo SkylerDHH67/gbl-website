@@ -134,7 +134,11 @@
     var lookup = R.playerLookup(data.players);
     var partsById = {}; (data.parts || []).forEach(function (p) { partsById[p.partId] = p; });
     var buildsById = {}; (data.builds || []).forEach(function (b) { buildsById[b.buildId] = b; });
-    el.innerHTML = top.map(function (r, i) {
+    var headerRow = '<div class="result-row" style="border-bottom:1px solid var(--line);padding-bottom:7px;">' +
+      '<span style="font-family:var(--data);font-size:0.68rem;letter-spacing:0.06em;text-transform:uppercase;color:var(--text-faint);">Build</span>' +
+      '<span style="font-family:var(--data);font-size:0.68rem;letter-spacing:0.06em;text-transform:uppercase;color:var(--text-faint);">Rtg · Win% · Used</span>' +
+      '</div>';
+    el.innerHTML = headerRow + top.map(function (r, i) {
       var pilot = lookup(r.playerId);
       var label = R.buildLabelOrFallback(buildsById[r.buildId], partsById, r.buildId);
       return '<div class="result-row"><span class="rank-cell' + (i < 3 ? " top" : "") + '">' + (i + 1) + '.</span> ' +

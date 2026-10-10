@@ -254,9 +254,18 @@
       if (idx === -1) return;
       dist[pair.slice(0, idx)] = U.num(pair.slice(idx + 1));
     });
+    var pointsScored = U.num(raw.points_scored);
+    var pointsAgainst = U.num(raw.points_against);
+    // Net rating = points scored / points scored against - "is this build
+    // keeping its head above water." A build that's never conceded a point
+    // yet (pointsAgainst === 0) shows as its raw points scored instead of
+    // a divide-by-zero/Infinity, so a small-sample perfect build doesn't
+    // render as a broken value.
+    var netRating = pointsAgainst > 0 ? pointsScored / pointsAgainst : pointsScored;
     return {
       buildId: raw.build_id, playerId: raw.player_id, timesUsed: U.num(raw.times_used), timesWon: U.num(raw.times_won),
-      pointsScored: U.num(raw.points_scored), pointsPerBattle: U.num(raw.points_per_battle), winRate: U.num(raw.win_rate),
+      pointsScored: pointsScored, pointsAgainst: pointsAgainst, netRating: Math.round(netRating * 100) / 100,
+      pointsPerBattle: U.num(raw.points_per_battle), winRate: U.num(raw.win_rate),
       finishDistribution: dist
     };
   }
