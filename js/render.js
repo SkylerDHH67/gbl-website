@@ -135,18 +135,54 @@
     return slots.filter(function (s) { return String(s.role || "").toLowerCase() === "blade" && s.pid; })[0] || null;
   }
 
+  // Ratchet parts are catalogued with spelled-out numbers (e.g. "One
+  // Sixty") because that's how the live scorekeeper sidebar needs them
+  // typed/read during a match, but the public site should show the actual
+  // Beyblade X-style code ("1-60"). Only ever applied to the Ratchet slot,
+  // and only when every word is a recognized number word - "No Ratchet"
+  // (an integrated-ratchet build with no separate ratchet part) has a
+  // non-number word in it and is deliberately left untouched.
+  var NUMBER_WORDS = {
+    zero: 0, one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10,
+    twenty: 20, thirty: 30, forty: 40, fifty: 50, sixty: 60, seventy: 70, eighty: 80, ninety: 90
+  };
+  function formatRatchetName(name) {
+    var raw = String(name == null ? "" : name).trim();
+    if (!raw) return raw;
+    var words = raw.split(/\s+/);
+    if (words.length < 2) return raw;
+    var nums = words.map(function (w) { return NUMBER_WORDS[w.toLowerCase()]; });
+    if (nums.some(function (n) { return n === undefined; })) return raw; // not a pure number-word name - leave as-is
+    return nums.join("-");
+  }
+
   // Composes "Shatter Horus / 1-60 / Hexa" from a build's three slots in
-  // slot order. Returns null if the build itself isn't resolvable (older/
-  // test build not in the Builds feed) so callers can fall back to the
-  // bare build_id.
+  // slot order, formatting the Ratchet slot's name via formatRatchetName.
+  // Returns null if the build itself isn't resolvable (older/test build
+  // not in the Builds feed) so callers can fall back to the bare
+  // build_id - though build_id itself should never reach page text; see
+  // buildLabelOrFallback below for the safe version of that fallback.
   function fullBuildLabel(build, partsById) {
     if (!build) return null;
-    var slots = [build.slot1PartId, build.slot2PartId, build.slot3PartId].filter(Boolean);
+    var slots = [
+      { pid: build.slot1PartId, role: build.slot1Role },
+      { pid: build.slot2PartId, role: build.slot2Role },
+      { pid: build.slot3PartId, role: build.slot3Role }
+    ].filter(function (s) { return s.pid; });
     if (!slots.length) return null;
-    return slots.map(function (pid) {
-      var p = partsById[pid];
-      return (p && p.displayName) || pid;
+    return slots.map(function (s) {
+      var p = partsById[s.pid];
+      var label = (p && p.displayName) || s.pid;
+      return String(s.role || "").toLowerCase() === "ratchet" ? formatRatchetName(label) : label;
     }).join(" / ");
+  }
+
+  // The one sanctioned fallback when a build can't be resolved to a real
+  // label (test data, a build removed from the Builds feed, etc.) - shows
+  // "Unlisted Build" instead of ever printing a raw build_id/part_id, which
+  // are internal tracking keys and should never appear on the public site.
+  function buildLabelOrFallback(build, partsById, buildId) {
+    return fullBuildLabel(build, partsById) || "Unlisted Build";
   }
 
   window.APP_RENDER = {
@@ -156,6 +192,7 @@
     playerLogoHTML: playerLogoHTML, resultBadge: resultBadge,
     statusBadge: statusBadge, buildLabel: buildLabel,
     FINISH_LABELS: FINISH_LABELS, FINISH_COLORS: FINISH_COLORS, FINISH_ORDER: FINISH_ORDER,
-    finishBarHTML: finishBarHTML, bladeSlotOf: bladeSlotOf, fullBuildLabel: fullBuildLabel
+    finishBarHTML: finishBarHTML, bladeSlotOf: bladeSlotOf, fullBuildLabel: fullBuildLabel,
+    formatRatchetName: formatRatchetName, buildLabelOrFallback: buildLabelOrFallback
   };
 })();

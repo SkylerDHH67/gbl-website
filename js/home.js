@@ -132,10 +132,13 @@
     var top = qualified.sort(function (a, b) { return b.pointsPerBattle - a.pointsPerBattle || b.winRate - a.winRate; })
       .slice(0, window.APP_CONFIG.HOME_LEADERS_COUNT);
     var lookup = R.playerLookup(data.players);
+    var partsById = {}; (data.parts || []).forEach(function (p) { partsById[p.partId] = p; });
+    var buildsById = {}; (data.builds || []).forEach(function (b) { buildsById[b.buildId] = b; });
     el.innerHTML = top.map(function (r, i) {
       var pilot = lookup(r.playerId);
+      var label = R.buildLabelOrFallback(buildsById[r.buildId], partsById, r.buildId);
       return '<div class="result-row"><span class="rank-cell' + (i < 3 ? " top" : "") + '">' + (i + 1) + '.</span> ' +
-        '<span><span style="font-family:var(--data);font-weight:700;">' + U.esc(r.buildId) + '</span> <span style="color:var(--text-faint);font-size:0.82rem;">— ' + U.esc(pilot.displayName) + '</span></span>' +
+        '<span><span style="font-family:var(--data);font-weight:700;">' + U.esc(label) + '</span> <span style="color:var(--text-faint);font-size:0.82rem;">— ' + U.esc(pilot.displayName) + '</span></span>' +
         '<span class="result-score">' + r.pointsPerBattle.toFixed(2) + ' <span style="color:var(--text-faint);font-weight:400;font-size:0.78rem;">rtg</span>' +
         '<span style="color:var(--text-faint);font-weight:400;font-size:0.78rem;"> · ' + U.pct(r.winRate) + ' · ' + r.timesUsed + 'x</span></span></div>';
     }).join("");

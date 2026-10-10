@@ -89,7 +89,7 @@
     populateSelect(document.getElementById("sl-stage"), stageItems, function (i) { return i.label; });
 
     var buildItems = Object.keys(buildIdsSeen).map(function (id) {
-      return { value: id, label: R.fullBuildLabel(buildsById[id], partsById) || id };
+      return { value: id, label: R.buildLabelOrFallback(buildsById[id], partsById, id) };
     });
     populateSelect(document.getElementById("sl-build"), buildItems, function (i) { return i.label; });
 
@@ -159,7 +159,7 @@
       });
       var buildList = Object.keys(byBuild).map(function (id) {
         var s = byBuild[id];
-        return { id: id, label: R.fullBuildLabel(buildsById[id], partsById) || id, used: s.used, won: s.won, winRate: s.used ? s.won / s.used : 0 };
+        return { id: id, label: R.buildLabelOrFallback(buildsById[id], partsById, id), used: s.used, won: s.won, winRate: s.used ? s.won / s.used : 0 };
       }).sort(function (a, b) { return b.used - a.used; });
 
       buildRows = '<h2 class="section-title">Builds used in this filter</h2><div class="table-wrap"><table class="data-table"><thead><tr><th>Build</th><th class="num">Used</th><th class="num">Won</th><th class="num">Win Rate</th></tr></thead><tbody>' +
@@ -221,7 +221,7 @@
     });
     var buildList = Object.keys(byBuild).map(function (id) {
       var s = byBuild[id];
-      return { label: R.fullBuildLabel(buildsById[id], partsById) || id, used: s.used, won: s.won, winRate: s.used ? s.won / s.used : 0 };
+      return { label: R.buildLabelOrFallback(buildsById[id], partsById, id), used: s.used, won: s.won, winRate: s.used ? s.won / s.used : 0 };
     }).sort(function (a, b) { return b.used - a.used; }).slice(0, 15);
 
     el.innerHTML = '<h2 class="section-title">League-wide</h2>' +

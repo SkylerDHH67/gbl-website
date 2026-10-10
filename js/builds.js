@@ -35,34 +35,11 @@
     return byId;
   }
 
-  // Which of a build's three slots is the Blade - identified by role, not
-  // position, so this stays correct even if slots were ever entered out
-  // of order.
-  function bladeSlot(build) {
-    if (!build) return null;
-    var slots = [
-      { pid: build.slot1PartId, role: build.slot1Role },
-      { pid: build.slot2PartId, role: build.slot2Role },
-      { pid: build.slot3PartId, role: build.slot3Role }
-    ];
-    return slots.filter(function (s) { return String(s.role || "").toLowerCase() === "blade" && s.pid; })[0] || null;
-  }
-
-  // Composes "Shatter Horus / 1-60 / Hexa" from a build's three slots, in
-  // slot order (Blade/Ratchet/Bit by convention). Falls back to the raw
-  // part_id for any slot whose part can't be found in the Parts Catalog
-  // feed, and returns null entirely if the build itself isn't in the
-  // Builds feed (older/removed build, or test data) - callers fall back
-  // to the bare build_id in that case.
-  function fullBuildLabel(build, partsById) {
-    if (!build) return null;
-    var slots = [build.slot1PartId, build.slot2PartId, build.slot3PartId].filter(Boolean);
-    if (!slots.length) return null;
-    return slots.map(function (pid) {
-      var p = partsById[pid];
-      return (p && p.displayName) || pid;
-    }).join(" / ");
-  }
+  // bladeSlot/fullBuildLabel live in render.js (shared with Stats Lab and
+  // Player Profile) so build-label formatting - including the ratchet
+  // "1-60" display convention and never falling back to a raw build_id -
+  // can't drift between pages.
+  var bladeSlot = R.bladeSlotOf;
 
   // Small inline thumbnail of just the Blade part. A same-size placeholder
   // renders when there's no image (rather than nothing at all) so every
@@ -84,7 +61,7 @@
     return {
       raw: r,
       build: build,
-      label: fullBuildLabel(build, partsById) || r.buildId,
+      label: R.buildLabelOrFallback(build, partsById, r.buildId),
       bladePartId: slot ? slot.pid : "",
       bladeName: bladePart ? bladePart.displayName : "",
       playerName: playerLookup(r.playerId).displayName,

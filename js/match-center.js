@@ -62,6 +62,64 @@
     return '<div class="thumb"></div>';
   }
 
+  // Resolves a build_id to its Blade part (for the deck card thumbnail)
+  // using the same role-based lookup the Builds page uses.
+  function bladePartOf(buildId, buildsById, partsById) {
+    var slot = R.bladeSlotOf(buildsById[buildId]);
+    return slot ? partsById[slot.pid] : null;
+  }
+
+  // Internal tracking keys (build_id, the engine's uppercase finish_type)
+  // should never reach page text - these two helpers are the only place
+  // Match Center converts either one for display.
+  function buildLabel(buildId, buildsById, partsById) {
+    return R.buildLabelOrFallback(buildsById[buildId], partsById, buildId);
+  }
+  function finishLabel(finishType) {
+    return R.FINISH_LABELS[finishType] || finishType || "—";
+  }
+
+  // A lightweight inline SVG line chart of cumulative score after every
+  // real battle (battle 0 = 0-0) - no charting library dependency, just
+  // two polylines plotted against the match's target score. This is the
+  // "how did the score actually move" view; the flow-bar elsewhere stays
+  // the "who won each individual battle, sized by points" view - the two
+  // are complementary, not duplicates.
+  function scoreLineSVG(realBattles, match, lookup) {
+    var a = lookup(match.playerAId), b = lookup(match.playerBId);
+    var n = realBattles.length;
+    var maxScore = match.targetScore;
+    realBattles.forEach(function (e) { maxScore = Math.max(maxScore, e.scoreAAfter, e.scoreBAfter); });
+    var W = 640, H = 220, padL = 32, padR = 16, padT = 16, padB = 28;
+    var plotW = W - padL - padR, plotH = H - padT - padB;
+    function x(i) { return padL + (n === 0 ? 0 : (i / n) * plotW); }
+    function y(v) { return padT + plotH - (v / maxScore) * plotH; }
+    var ptsA = [[0, 0]], ptsB = [[0, 0]];
+    realBattles.forEach(function (e, i) { ptsA.push([i + 1, e.scoreAAfter]); ptsB.push([i + 1, e.scoreBAfter]); });
+    function toPath(pts) {
+      return pts.map(function (p, idx) { return (idx === 0 ? "M" : "L") + x(p[0]).toFixed(1) + "," + y(p[1]).toFixed(1); }).join(" ");
+    }
+    function toDots(pts, color) {
+      return pts.map(function (p) { return '<circle cx="' + x(p[0]).toFixed(1) + '" cy="' + y(p[1]).toFixed(1) + '" r="3.5" fill="' + color + '"/>'; }).join("");
+    }
+    var targetY = y(match.targetScore).toFixed(1);
+    return '<div style="display:flex;gap:16px;align-items:center;margin-bottom:8px;font-size:0.82rem;color:var(--text-dim);">' +
+      '<span><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:var(--arc);margin-right:5px;"></span>' + U.esc(a.displayName) + '</span>' +
+      '<span><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:var(--spin);margin-right:5px;"></span>' + U.esc(b.displayName) + '</span>' +
+      '</div>' +
+      '<svg viewBox="0 0 ' + W + ' ' + H + '" style="width:100%;height:auto;display:block;">' +
+      '<line x1="' + padL + '" y1="' + targetY + '" x2="' + (W - padR) + '" y2="' + targetY + '" stroke="var(--line)" stroke-dasharray="4 4"/>' +
+      '<text x="' + (W - padR) + '" y="' + (parseFloat(targetY) - 6).toFixed(1) + '" text-anchor="end" font-size="10" fill="var(--text-faint)">Target ' + match.targetScore + '</text>' +
+      '<line x1="' + padL + '" y1="' + padT + '" x2="' + padL + '" y2="' + (H - padB) + '" stroke="var(--line)"/>' +
+      '<line x1="' + padL + '" y1="' + (H - padB) + '" x2="' + (W - padR) + '" y2="' + (H - padB) + '" stroke="var(--line)"/>' +
+      '<path d="' + toPath(ptsA) + '" fill="none" stroke="var(--arc)" stroke-width="2.5"/>' +
+      '<path d="' + toPath(ptsB) + '" fill="none" stroke="var(--spin)" stroke-width="2.5"/>' +
+      toDots(ptsA, "var(--arc)") + toDots(ptsB, "var(--spin)") +
+      '<text x="' + padL + '" y="' + (H - 8) + '" font-size="10" fill="var(--text-faint)">Battle 1</text>' +
+      (n > 1 ? '<text x="' + (W - padR) + '" y="' + (H - 8) + '" text-anchor="end" font-size="10" fill="var(--text-faint)">Battle ' + n + '</text>' : '') +
+      '</svg>';
+  }
+
   function renderHeader(match, lookup) {
     var a = lookup(match.playerAId), b = lookup(match.playerBId);
     var aWon = match.winnerPlayerId === match.playerAId;
@@ -88,7 +146,7 @@
       html += '<p style="font-size:1.05rem;">Match in progress — ' + match.finalScoreA + '–' + match.finalScoreB + '.</p>';
     }
     if (redoCount) html += '<p style="color:var(--text-faint);font-size:0.85rem;">' + redoCount + ' redo' + (redoCount === 1 ? "" : "s") + ' occurred during this match (Air Contact / No Contact) — these don\'t affect score and are shown in the Battle Log tab.</p>';
-    html += renderFlowBarHTML(realBattles, match);
+    if (realBattles.length) html += scoreLineSVG(realBattles, match, lookup);
     html += '</div>';
     document.getElementById("mc-summary").innerHTML = html;
   }
@@ -97,12 +155,12 @@
     if (!realBattles.length) return R.emptyBlock("No battles recorded yet");
     var segs = realBattles.map(function (e) {
       var aWon = e.winnerPlayerId === match.playerAId;
-      return '<div class="' + (aWon ? "a" : "b") + '" style="flex:' + Math.max(e.pointsAwarded, 1) + ';" title="' + U.esc(e.finishType) + '"></div>';
+      return '<div class="' + (aWon ? "a" : "b") + '" style="flex:' + Math.max(e.pointsAwarded, 1) + ';" title="' + U.esc(finishLabel(e.finishType)) + '"></div>';
     }).join("");
     return '<div class="flow-bar" style="margin-top:14px;">' + segs + '</div>';
   }
 
-  function renderBattleLog(timeline, lookup) {
+  function renderBattleLog(timeline, lookup, buildsById, partsById) {
     var el = document.getElementById("mc-battle-log");
     if (!timeline.length) { el.innerHTML = R.emptyBlock("No battle events recorded for this match"); return; }
     var html = '<div class="panel" style="padding:0;">';
@@ -114,45 +172,46 @@
         return;
       }
       if (e.isRedo) {
-        html += '<div class="battle-row redo"><span class="seq">–</span><span>Redo — ' + U.esc(e.finishType) + '</span></div>';
+        html += '<div class="battle-row redo"><span class="seq">–</span><span>Redo — ' + U.esc(finishLabel(e.finishType)) + '</span></div>';
         return;
       }
-      var aWon = e.winnerPlayerId ? true : false;
       html += '<div class="battle-row"><span class="seq">' + (e.battleSeq !== null ? e.battleSeq : "") + '</span>' +
-        '<span class="finish-tag">' + U.esc(e.finishType) + '</span>' +
-        '<span style="flex:1;">' + U.esc(e.buildIdA) + ' <span style="color:var(--text-faint)">vs</span> ' + U.esc(e.buildIdB) + '</span>' +
+        '<span class="finish-tag">' + U.esc(finishLabel(e.finishType)) + '</span>' +
+        '<span style="flex:1;">' + U.esc(buildLabel(e.buildIdA, buildsById, partsById)) + ' <span style="color:var(--text-faint)">vs</span> ' + U.esc(buildLabel(e.buildIdB, buildsById, partsById)) + '</span>' +
         '<span style="font-family:var(--data);font-weight:700;">' + e.scoreAAfter + '–' + e.scoreBAfter + '</span></div>';
     });
     html += "</div>";
     el.innerHTML = html;
   }
 
-  function renderBuilds(decks, box, match, parts) {
+  function renderBuilds(decks, box, match, buildsById, partsById) {
     var el = document.getElementById("mc-builds");
-    var partsById = {}; parts.forEach(function (p) { partsById[p.partId] = p; });
     function deckHTML(deckBuildIds, label) {
       if (!deckBuildIds.length) return '<div>' + R.emptyBlock("No builds recorded", "This match may have ended before every build was used.") + '</div>';
       return '<div><div class="eyebrow">' + label + '</div>' + deckBuildIds.map(function (buildId) {
         var stats = box[buildId];
-        return '<div class="deck-card" style="margin-bottom:8px;">' + partThumb(null) +
-          '<div><div style="font-weight:600;font-family:var(--data);">' + U.esc(buildId) + '</div>' +
+        var winPct = stats && stats.battles > 0 ? stats.wins / stats.battles : null;
+        return '<div class="deck-card" style="margin-bottom:8px;">' + partThumb(bladePartOf(buildId, buildsById, partsById)) +
+          '<div style="flex:1;min-width:0;"><div style="font-weight:600;">' + U.esc(buildLabel(buildId, buildsById, partsById)) + '</div>' +
           (stats ? '<div style="font-size:0.8rem;color:var(--text-dim);">' + stats.battles + ' battles · ' + stats.wins + 'W-' + stats.losses + 'L</div>' : '<div style="font-size:0.8rem;color:var(--text-faint);">Not piloted this match</div>') +
-          '</div></div>';
+          '</div>' +
+          (winPct !== null ? '<div style="width:46px;flex-shrink:0;text-align:right;font-family:var(--data);font-weight:700;color:' + (winPct >= 0.5 ? "var(--arc-bright)" : "var(--text-faint)") + ';">' + U.pct(winPct) + '</div>' : '') +
+          '</div>';
       }).join("") + "</div>";
     }
     el.innerHTML = '<div class="grid grid-2">' + deckHTML(decks.deckA, "Player A deck") + deckHTML(decks.deckB, "Player B deck") + '</div>' +
       '<p style="color:var(--text-faint);font-size:0.8rem;margin-top:14px;">Part imagery appears automatically once image URLs are set in the Parts Catalog — builds shown above without art simply don\'t have one yet.</p>';
   }
 
-  function renderStats(box) {
+  function renderStats(box, buildsById, partsById) {
     var el = document.getElementById("mc-stats");
     var rows = Object.keys(box).map(function (id) { return box[id]; });
     if (!rows.length) { el.innerHTML = R.emptyBlock("No battles recorded yet"); return; }
     el.innerHTML = '<div class="table-wrap"><table class="data-table"><thead><tr><th>Build</th><th class="num">Battles</th><th class="num">W</th><th class="num">L</th><th class="num">Win%</th><th class="num">Pts Won</th><th class="num">Pts Allowed</th><th>Finishes</th></tr></thead><tbody>' +
       rows.map(function (r) {
         var winPct = r.battles > 0 ? r.wins / r.battles : 0;
-        var finishes = Object.keys(r.finishCounts).map(function (f) { return f + " ×" + r.finishCounts[f]; }).join(", ") || "—";
-        return '<tr><td style="font-family:var(--data)">' + U.esc(r.buildId) + '</td><td class="num">' + r.battles + '</td><td class="num">' + r.wins + '</td><td class="num">' + r.losses + '</td><td class="num">' + U.pct(winPct) + '</td><td class="num">' + r.pointsWon + '</td><td class="num">' + r.pointsAllowed + '</td><td>' + U.esc(finishes) + '</td></tr>';
+        var finishes = Object.keys(r.finishCounts).map(function (f) { return finishLabel(f) + " ×" + r.finishCounts[f]; }).join(", ") || "—";
+        return '<tr><td>' + U.esc(buildLabel(r.buildId, buildsById, partsById)) + '</td><td class="num">' + r.battles + '</td><td class="num">' + r.wins + '</td><td class="num">' + r.losses + '</td><td class="num">' + U.pct(winPct) + '</td><td class="num">' + r.pointsWon + '</td><td class="num">' + r.pointsAllowed + '</td><td>' + U.esc(finishes) + '</td></tr>';
       }).join("") + "</tbody></table></div>";
   }
 
@@ -161,7 +220,7 @@
     var realBattles = timeline.filter(function (e) { return e.kind === "battle" && !e.isRedo; });
     if (!realBattles.length) { el.innerHTML = R.emptyBlock("No battles recorded yet"); return; }
     var rows = realBattles.map(function (e, i) {
-      return '<div class="result-row"><span>Battle ' + (i + 1) + ' — ' + U.esc(e.finishType) + '</span><span class="result-score">' + e.scoreAAfter + '–' + e.scoreBAfter + '</span></div>';
+      return '<div class="result-row"><span>Battle ' + (i + 1) + ' — ' + U.esc(finishLabel(e.finishType)) + '</span><span class="result-score">' + e.scoreAAfter + '–' + e.scoreBAfter + '</span></div>';
     }).join("");
     el.innerHTML = '<div class="panel">' + renderFlowBarHTML(realBattles, match) +
       '<p style="color:var(--text-dim);font-size:0.85rem;margin:14px 0 6px;">Each segment above is one battle, sized by points awarded and colored by winner — read left to right for how the match unfolded.</p>' +
@@ -191,12 +250,14 @@
     }
     var timeline = buildTimeline(matchId, data);
     var decksAndBox = computeDecksAndBoxScore(matchId, match, timeline);
+    var buildsById = {}; data.builds.forEach(function (b) { buildsById[b.buildId] = b; });
+    var partsById = {}; data.parts.forEach(function (p) { partsById[p.partId] = p; });
 
     renderHeader(match, lookup);
     renderSummary(match, lookup, timeline);
-    renderBattleLog(timeline, lookup);
-    renderBuilds(decksAndBox, decksAndBox.box, match, data.parts);
-    renderStats(decksAndBox.box);
+    renderBattleLog(timeline, lookup, buildsById, partsById);
+    renderBuilds(decksAndBox, decksAndBox.box, match, buildsById, partsById);
+    renderStats(decksAndBox.box, buildsById, partsById);
     renderFlow(timeline, match);
     wireTabs();
   }).catch(function (err) {

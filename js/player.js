@@ -86,6 +86,38 @@
     }).join(" ");
   }
 
+  // Last 10 *actual* matches with final scores - the Last 10 badge trail
+  // above is a quick-glance summary, this is the detail behind it. Sourced
+  // directly from feed_matches (same data Match Center is built from), not
+  // a new/duplicate source.
+  function recentMatchesHTML(data, playerId, lookup) {
+    var mine = data.matches.filter(function (m) {
+      return (m.playerAId === playerId || m.playerBId === playerId) && m.status === "COMPLETE";
+    }).sort(function (a, b) { return new Date(b.date).getTime() - new Date(a.date).getTime(); }).slice(0, 10);
+
+    if (!mine.length) return '<div style="color:var(--text-faint);font-size:0.85rem;">No completed matches yet.</div>';
+
+    return '<div class="table-wrap"><table class="data-table"><thead><tr><th>Date</th><th>Opponent</th><th class="num">Score</th><th>Result</th></tr></thead><tbody>' +
+      mine.map(function (m) {
+        var isA = m.playerAId === playerId;
+        var myScore = isA ? m.finalScoreA : m.finalScoreB;
+        var oppScore = isA ? m.finalScoreB : m.finalScoreA;
+        var opp = lookup(isA ? m.playerBId : m.playerAId);
+        var won = m.winnerPlayerId === playerId;
+        var href = 'match-center.html?id=' + encodeURIComponent(m.matchId);
+        // Opponent cell links to their profile; the rest link to the match
+        // center. Kept as separate <a> tags per cell (not one <a> wrapping
+        // the whole <tr>, which the HTML table parser doesn't allow) and
+        // never nested inside one another.
+        return '<tr>' +
+          '<td><a href="' + href + '" style="color:inherit;">' + U.esc(U.fmtDateShort(m.date)) + '</a></td>' +
+          '<td>' + R.playerCellHTML(opp) + '</td>' +
+          '<td class="num"><a href="' + href + '" style="color:inherit;"><span class="num-cell">' + myScore + '–' + oppScore + '</span></a></td>' +
+          '<td><a href="' + href + '" style="color:inherit;text-decoration:none;">' + R.resultBadge(won, "A") + '</a></td>' +
+          '</tr>';
+      }).join("") + '</tbody></table></div>';
+  }
+
   function buildMiniTableHTML(title, rows, emptyMsg) {
     if (!rows.length) return '<div><div class="eyebrow">' + U.esc(title) + '</div><div style="color:var(--text-faint);font-size:0.85rem;">' + U.esc(emptyMsg) + '</div></div>';
     return '<div><div class="eyebrow">' + U.esc(title) + '</div><div class="table-wrap"><table class="data-table"><thead><tr><th>Build</th><th class="num">Used</th><th class="num">Win Rate</th></tr></thead><tbody>' +
@@ -102,9 +134,10 @@
   function dashboardHTML(data, playerId, currentRow) {
     var partsById = {}; (data.parts || []).forEach(function (p) { partsById[p.partId] = p; });
     var buildsById = {}; (data.builds || []).forEach(function (b) { buildsById[b.buildId] = b; });
+    var lookup = R.playerLookup(data.players);
 
     var myBuilds = data.buildStats.filter(function (b) { return b.playerId === playerId; }).map(function (b) {
-      return { buildId: b.buildId, label: R.fullBuildLabel(buildsById[b.buildId], partsById) || b.buildId, timesUsed: b.timesUsed, winRate: b.winRate };
+      return { buildId: b.buildId, label: R.buildLabelOrFallback(buildsById[b.buildId], partsById, b.buildId), timesUsed: b.timesUsed, winRate: b.winRate };
     });
 
     var mostUsed = myBuilds.slice().sort(function (a, b) { return b.timesUsed - a.timesUsed; }).slice(0, 5);
@@ -113,8 +146,9 @@
 
     return '<section class="panel" style="margin-top:20px;">' +
       '<h2 class="section-title">Recent Outlook</h2>' +
-      '<div class="eyebrow">Recent Form' + (currentRow ? "" : "") + '</div>' +
-      '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:18px;">' + formTrailHTML(currentRow && currentRow.last10) + '</div>' +
+      '<div class="eyebrow">Recent Form</div>' +
+      '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px;">' + formTrailHTML(currentRow && currentRow.last10) + '</div>' +
+      '<div style="margin-bottom:20px;">' + recentMatchesHTML(data, playerId, lookup) + '</div>' +
       '<div class="grid grid-2">' +
       buildMiniTableHTML("Most-Used Builds", mostUsed, "No build usage recorded yet.") +
       buildMiniTableHTML("Most-Effective Builds", mostEffective, "Needs at least " + LOW_SAMPLE_THRESHOLD + " uses on a build before a reliable win rate shows here.") +
