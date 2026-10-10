@@ -79,60 +79,160 @@
     return R.FINISH_LABELS[finishType] || finishType || "—";
   }
 
+  // Module-level handoff from scoreLineSVG to wireScoreLineTooltips: keyed
+  // "A0"/"B0"/"A1"/"B1"/... (side + point index), since the HTML string
+  // scoreLineSVG returns has nowhere else to carry rich tooltip content
+  // out to the code that wires up hover/tap behavior after insertion.
+  var scoreLineTooltipData = null;
+
+  // Picks a readable gridline step for the Y (score) axis. Match scores are
+  // small (first-to-7, first-to-10, rarely higher), so every integer is
+  // normally fine; this only widens the step if a target score is ever
+  // configured unusually high, to avoid a wall of overlapping labels.
+  function niceAxisStep(maxValue) {
+    if (maxValue <= 12) return 1;
+    return Math.ceil(maxValue / 10);
+  }
+
   // A lightweight inline SVG line chart of cumulative score after every
   // real battle (battle 0 = 0-0) - no charting library dependency, just
   // two polylines plotted against the match's target score. This is the
   // "how did the score actually move" view; the flow-bar elsewhere stays
   // the "who won each individual battle, sized by points" view - the two
-  // are complementary, not duplicates.
+  // are complementary, not duplicates. Both axes carry a real numeric
+  // scale (battle number along X, score along Y) so the shape of the line
+  // is actually readable, not just decorative, and every point is a
+  // hoverable/tappable hit target that pops up what happened there.
   function scoreLineSVG(realBattles, match, lookup, buildsById, partsById) {
     var a = lookup(match.playerAId), b = lookup(match.playerBId);
     var n = realBattles.length;
     var maxScore = match.targetScore;
     realBattles.forEach(function (e) { maxScore = Math.max(maxScore, e.scoreAAfter, e.scoreBAfter); });
-    var W = 640, H = 220, padL = 32, padR = 16, padT = 16, padB = 28;
+    var W = 660, H = 260, padL = 42, padR = 16, padT = 18, padB = 46;
     var plotW = W - padL - padR, plotH = H - padT - padB;
     function x(i) { return padL + (n === 0 ? 0 : (i / n) * plotW); }
     function y(v) { return padT + plotH - (v / maxScore) * plotH; }
     var ptsA = [[0, 0]], ptsB = [[0, 0]];
-    // index 0 has no battle behind it (match start) - titles array is kept
-    // one-indexed-by-offset so titles[i] lines up with ptsA[i]/ptsB[i].
-    var titles = ["Match start — 0–0"];
+    var tooltips = {};
+    var startEntry = { title: "Match Start", lines: ["0–0"] };
+    tooltips.A0 = startEntry; tooltips.B0 = startEntry;
     realBattles.forEach(function (e, i) {
-      ptsA.push([i + 1, e.scoreAAfter]); ptsB.push([i + 1, e.scoreBAfter]);
-      titles.push("Battle " + (i + 1) + ": " + battleSentenceText(e, match, lookup, buildsById, partsById) + " (" + e.scoreAAfter + "–" + e.scoreBAfter + ")");
+      var idx = i + 1;
+      ptsA.push([idx, e.scoreAAfter]); ptsB.push([idx, e.scoreBAfter]);
+      var entry = {
+        title: "Battle " + idx,
+        lines: [battleSentenceHTML(e, match, lookup, buildsById, partsById), '<strong>' + e.scoreAAfter + '–' + e.scoreBAfter + '</strong>']
+      };
+      tooltips["A" + idx] = entry; tooltips["B" + idx] = entry;
     });
+    scoreLineTooltipData = tooltips;
     function toPath(pts) {
       return pts.map(function (p, idx) { return (idx === 0 ? "M" : "L") + x(p[0]).toFixed(1) + "," + y(p[1]).toFixed(1); }).join(" ");
     }
-    // Each dot carries a <title> (native hover/focus tooltip, no extra JS
-    // needed) naming the battle's finish, winner, build, and matchup, plus
-    // a transparent oversized hit-circle so the tooltip is easy to trigger
-    // on both desktop hover and mobile tap, not just the tiny 3.5px dot.
-    function toDots(pts, color) {
+    // Each dot carries a <title> (native hover/focus tooltip - works even
+    // if the JS wiring below fails to attach for any reason) plus a
+    // data-key the JS tooltip reads from scoreLineTooltipData, and a
+    // transparent oversized hit-circle so it's easy to trigger on both
+    // desktop hover and mobile tap, not just the tiny 3.5px dot.
+    function toDots(pts, color, side, plainTitles) {
       return pts.map(function (p, idx) {
-        var title = '<title>' + U.esc(titles[idx]) + '</title>';
+        var key = side + p[0];
+        var title = '<title>' + U.esc(plainTitles[idx]) + '</title>';
         var cx = x(p[0]).toFixed(1), cy = y(p[1]).toFixed(1);
-        return '<circle cx="' + cx + '" cy="' + cy + '" r="10" fill="transparent" style="cursor:pointer;">' + title + '</circle>' +
+        return '<circle class="score-dot-hit" data-key="' + key + '" tabindex="0" cx="' + cx + '" cy="' + cy + '" r="11" fill="transparent" style="cursor:pointer;">' + title + '</circle>' +
           '<circle cx="' + cx + '" cy="' + cy + '" r="3.5" fill="' + color + '" style="pointer-events:none;"></circle>';
       }).join("");
     }
+    var plainA = ["Match start — 0–0"], plainB = ["Match start — 0–0"];
+    realBattles.forEach(function (e, i) {
+      var t = "Battle " + (i + 1) + ": " + battleSentenceText(e, match, lookup, buildsById, partsById) + " (" + e.scoreAAfter + "–" + e.scoreBAfter + ")";
+      plainA.push(t); plainB.push(t);
+    });
     var targetY = y(match.targetScore).toFixed(1);
-    return '<div style="display:flex;gap:16px;align-items:center;margin-bottom:8px;font-size:0.82rem;color:var(--text-dim);">' +
+
+    // Y-axis (score) gridlines + numeric labels, 0 up through maxScore.
+    var yStep = niceAxisStep(maxScore);
+    var yTicks = [];
+    for (var v = 0; v <= maxScore; v += yStep) yTicks.push(v);
+    if (yTicks[yTicks.length - 1] !== maxScore) yTicks.push(maxScore);
+    var yGrid = yTicks.map(function (v) {
+      var ty = y(v).toFixed(1);
+      return '<line x1="' + padL + '" y1="' + ty + '" x2="' + (W - padR) + '" y2="' + ty + '" stroke="var(--line)" stroke-opacity="0.35"/>' +
+        '<text x="' + (padL - 8) + '" y="' + (parseFloat(ty) + 3).toFixed(1) + '" text-anchor="end" font-size="10" fill="var(--text-faint)">' + v + '</text>';
+    }).join("");
+
+    // X-axis (battle number) tick marks + labels, one per real battle plus
+    // the "Start" point at 0 - not just the two end labels as before, so
+    // every point on the line can be read off the axis, not just guessed at.
+    var xTicks = [];
+    for (var i = 0; i <= n; i++) xTicks.push(i);
+    var xAxisY = H - padB;
+    var xGrid = xTicks.map(function (i) {
+      var tx = x(i).toFixed(1);
+      var label = i === 0 ? "Start" : String(i);
+      return '<line x1="' + tx + '" y1="' + xAxisY + '" x2="' + tx + '" y2="' + (xAxisY + 4) + '" stroke="var(--line)"/>' +
+        '<text x="' + tx + '" y="' + (xAxisY + 16) + '" text-anchor="middle" font-size="10" fill="var(--text-faint)">' + label + '</text>';
+    }).join("");
+
+    return '<div class="score-line-wrap" style="position:relative;">' +
+      '<div style="display:flex;gap:16px;align-items:center;margin-bottom:8px;font-size:0.82rem;color:var(--text-dim);">' +
       '<span><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:var(--arc);margin-right:5px;"></span>' + U.esc(a.displayName) + '</span>' +
       '<span><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:var(--spin);margin-right:5px;"></span>' + U.esc(b.displayName) + '</span>' +
       '</div>' +
       '<svg viewBox="0 0 ' + W + ' ' + H + '" style="width:100%;height:auto;display:block;">' +
-      '<line x1="' + padL + '" y1="' + targetY + '" x2="' + (W - padR) + '" y2="' + targetY + '" stroke="var(--line)" stroke-dasharray="4 4"/>' +
-      '<text x="' + (W - padR) + '" y="' + (parseFloat(targetY) - 6).toFixed(1) + '" text-anchor="end" font-size="10" fill="var(--text-faint)">Target ' + match.targetScore + '</text>' +
-      '<line x1="' + padL + '" y1="' + padT + '" x2="' + padL + '" y2="' + (H - padB) + '" stroke="var(--line)"/>' +
-      '<line x1="' + padL + '" y1="' + (H - padB) + '" x2="' + (W - padR) + '" y2="' + (H - padB) + '" stroke="var(--line)"/>' +
+      yGrid +
+      '<line x1="' + padL + '" y1="' + targetY + '" x2="' + (W - padR) + '" y2="' + targetY + '" stroke="var(--gold)" stroke-dasharray="4 4"/>' +
+      '<text x="' + (W - padR) + '" y="' + (parseFloat(targetY) - 6).toFixed(1) + '" text-anchor="end" font-size="10" fill="var(--gold)">Target ' + match.targetScore + '</text>' +
+      '<line x1="' + padL + '" y1="' + padT + '" x2="' + padL + '" y2="' + xAxisY + '" stroke="var(--line)"/>' +
+      '<line x1="' + padL + '" y1="' + xAxisY + '" x2="' + (W - padR) + '" y2="' + xAxisY + '" stroke="var(--line)"/>' +
+      xGrid +
+      '<text x="' + ((padL + (W - padR)) / 2).toFixed(1) + '" y="' + (H - 6) + '" text-anchor="middle" font-size="10" fill="var(--text-faint)" letter-spacing="0.04em">BATTLE #</text>' +
+      '<text x="12" y="' + ((padT + xAxisY) / 2).toFixed(1) + '" text-anchor="middle" font-size="10" fill="var(--text-faint)" letter-spacing="0.04em" transform="rotate(-90 12 ' + ((padT + xAxisY) / 2).toFixed(1) + ')">SCORE</text>' +
       '<path d="' + toPath(ptsA) + '" fill="none" stroke="var(--arc)" stroke-width="2.5"/>' +
       '<path d="' + toPath(ptsB) + '" fill="none" stroke="var(--spin)" stroke-width="2.5"/>' +
-      toDots(ptsA, "var(--arc)") + toDots(ptsB, "var(--spin)") +
-      '<text x="' + padL + '" y="' + (H - 8) + '" font-size="10" fill="var(--text-faint)">Battle 1</text>' +
-      (n > 1 ? '<text x="' + (W - padR) + '" y="' + (H - 8) + '" text-anchor="end" font-size="10" fill="var(--text-faint)">Battle ' + n + '</text>' : '') +
-      '</svg>';
+      toDots(ptsA, "var(--arc)", "A", plainA) + toDots(ptsB, "var(--spin)", "B", plainB) +
+      '</svg>' +
+      '</div>';
+  }
+
+  // Wires the hover/tap popup for the score-line chart's dots. Pure
+  // progressive enhancement: every dot already carries a native <title>
+  // tooltip baked into the SVG above, so if this never runs (or the
+  // browser doesn't fire these events for some reason) the chart is still
+  // fully informative, just via the browser's own tooltip instead of this
+  // styled one.
+  function wireScoreLineTooltips(container) {
+    if (!scoreLineTooltipData) return;
+    var wrap = container.querySelector(".score-line-wrap");
+    if (!wrap) return;
+    var tip = document.createElement("div");
+    tip.className = "score-line-tip";
+    tip.style.cssText = "position:absolute;display:none;pointer-events:none;background:var(--bg-elevated);border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-size:0.78rem;line-height:1.45;color:var(--text);max-width:240px;box-shadow:0 6px 18px rgba(0,0,0,0.4);z-index:5;";
+    wrap.appendChild(tip);
+    var data = scoreLineTooltipData;
+    function show(el) {
+      var entry = data[el.getAttribute("data-key")];
+      if (!entry) return;
+      tip.innerHTML = '<div style="font-weight:700;margin-bottom:3px;color:var(--text-faint);text-transform:uppercase;font-size:0.66rem;letter-spacing:0.05em;">' + entry.title + '</div>' + entry.lines.join("<br>");
+      tip.style.display = "block";
+      var wrapRect = wrap.getBoundingClientRect(), elRect = el.getBoundingClientRect();
+      var tw = tip.offsetWidth, th = tip.offsetHeight;
+      var left = elRect.left - wrapRect.left + elRect.width / 2 - tw / 2;
+      left = Math.max(0, Math.min(left, wrap.clientWidth - tw));
+      var top = elRect.top - wrapRect.top - th - 10;
+      if (top < 0) top = elRect.bottom - wrapRect.top + 8;
+      tip.style.left = left + "px";
+      tip.style.top = top + "px";
+    }
+    function hide() { tip.style.display = "none"; }
+    wrap.querySelectorAll(".score-dot-hit").forEach(function (el) {
+      el.addEventListener("mouseenter", function () { show(el); });
+      el.addEventListener("mouseleave", hide);
+      el.addEventListener("focus", function () { show(el); });
+      el.addEventListener("blur", hide);
+      el.addEventListener("click", function (ev) { ev.stopPropagation(); show(el); });
+    });
+    document.addEventListener("click", hide);
   }
 
   function renderHeader(match, lookup) {
@@ -163,7 +263,9 @@
     if (redoCount) html += '<p style="color:var(--text-faint);font-size:0.85rem;">' + redoCount + ' redo' + (redoCount === 1 ? "" : "s") + ' occurred during this match (Air Contact / No Contact) — these don\'t affect score and are shown in the Battle Log tab.</p>';
     if (realBattles.length) html += scoreLineSVG(realBattles, match, lookup, buildsById, partsById);
     html += '</div>';
-    document.getElementById("mc-summary").innerHTML = html;
+    var summaryEl = document.getElementById("mc-summary");
+    summaryEl.innerHTML = html;
+    if (realBattles.length) wireScoreLineTooltips(summaryEl);
   }
 
   function renderFlowBarHTML(realBattles, match) {
