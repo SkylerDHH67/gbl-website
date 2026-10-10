@@ -123,6 +123,27 @@
       '<div style="display:flex;flex-wrap:wrap;gap:6px;">' + legend + '</div>';
   }
 
+  // Net Rating (points_scored / points_against) is a ratio centered on 1.0
+  // ("keeping its head above water"), so rather than a hard red/blue cutoff
+  // right at 1.0 (which made anything at 0.99 look just as alarming as
+  // 0.3), this blends smoothly between the site's red and blue accents.
+  // Uses log2 so the scale is symmetric for a RATIO metric - a build at
+  // 2.0 (scores double what it concedes) is exactly as far from 1.0 as a
+  // build at 0.5 (concedes double what it scores), each pegged to a pure
+  // end color; 1.0 itself lands on a neutral blend, not full red.
+  var NET_RATING_LOW_RGB = [239, 62, 74];   // --spin (red) - net rating well under 1
+  var NET_RATING_HIGH_RGB = [95, 216, 236]; // --arc (blue) - net rating well over 1
+  function netRatingColor(netRating) {
+    var n = Number(netRating);
+    if (!isFinite(n) || n <= 0) n = 1;
+    var t = Math.max(-1, Math.min(1, Math.log(n) / Math.LN2)); // log2, clamped to [0.5x, 2x]
+    var frac = (t + 1) / 2; // 0 = pure red, 1 = pure blue
+    var rgb = NET_RATING_LOW_RGB.map(function (lo, i) {
+      return Math.round(lo + (NET_RATING_HIGH_RGB[i] - lo) * frac);
+    });
+    return "rgb(" + rgb.join(",") + ")";
+  }
+
   // Picks the highest-count entry out of a { SPIN: n, OVER: n, ... } map,
   // e.g. for "most common way this build wins" / "most common way this
   // build loses" callouts. Returns null for an empty/all-zero map rather
@@ -234,7 +255,7 @@
     playerLogoHTML: playerLogoHTML, resultBadge: resultBadge,
     statusBadge: statusBadge, buildLabel: buildLabel,
     FINISH_LABELS: FINISH_LABELS, FINISH_COLORS: FINISH_COLORS, FINISH_ORDER: FINISH_ORDER,
-    finishBarHTML: finishBarHTML, topFinish: topFinish, bladeSlotOf: bladeSlotOf, fullBuildLabel: fullBuildLabel,
+    finishBarHTML: finishBarHTML, topFinish: topFinish, netRatingColor: netRatingColor, bladeSlotOf: bladeSlotOf, fullBuildLabel: fullBuildLabel,
     formatRatchetName: formatRatchetName, buildLabelOrFallback: buildLabelOrFallback,
     pickCurrentStageId: pickCurrentStageId
   };

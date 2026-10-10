@@ -273,7 +273,7 @@
       rows.map(function (b) {
         var low = b.used < LOW_SAMPLE_THRESHOLD ? '<span class="badge" title="Small sample size">n&lt;' + LOW_SAMPLE_THRESHOLD + '</span> ' : "";
         return '<tr><td>' + U.esc(b.label) + '</td><td class="num"><span class="num-cell">' + low + b.used + '</span></td><td class="num"><span class="num-cell">' + U.pct(b.winRate) + '</span></td>' +
-          '<td class="num"><span class="num-cell" style="color:' + (b.netRating >= 1 ? "var(--arc-bright)" : "var(--spin)") + ';">' + b.netRating.toFixed(2) + '</span></td>' +
+          '<td class="num"><span class="num-cell" style="color:' + R.netRatingColor(b.netRating) + ';">' + b.netRating.toFixed(2) + '</span></td>' +
           '<td class="num"><span class="num-cell">' + b.pointsPerBattle.toFixed(2) + '</span></td></tr>';
       }).join("") + '</tbody></table></div>';
   }

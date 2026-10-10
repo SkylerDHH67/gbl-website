@@ -92,7 +92,7 @@
       '<span><strong style="color:var(--text);">' + U.pct(e.winRate) + '</strong> win rate</span>' +
       '<span><strong style="color:var(--text);">' + e.pointsScored + '</strong> pts for</span>' +
       '<span><strong style="color:var(--text);">' + e.pointsAgainst + '</strong> pts against</span>' +
-      '<span><strong style="color:' + (e.netRating >= 1 ? "var(--arc-bright)" : "var(--spin)") + ';">' + e.netRating.toFixed(2) + '</strong> net rating</span>' +
+      '<span><strong style="color:' + R.netRatingColor(e.netRating) + ';">' + e.netRating.toFixed(2) + '</strong> net rating</span>' +
       '<span><strong style="color:var(--text);">' + e.pointsPerBattle.toFixed(2) + '</strong> pts/battle</span>' +
       '<span><strong style="color:var(--text);">' + e.timesWon + '-' + e.timesLost + '</strong> battle record</span>' +
       '</div></div>';
@@ -162,7 +162,7 @@
           '<td class="num"><span class="num-cell">' + U.pct(e.winRate) + '</span></td>' +
           '<td class="num"><span class="num-cell">' + e.pointsScored + '</span></td>' +
           '<td class="num"><span class="num-cell">' + e.pointsAgainst + '</span></td>' +
-          '<td class="num"><span class="num-cell" style="color:' + (e.netRating >= 1 ? "var(--arc-bright)" : "var(--spin)") + ';font-weight:700;">' + e.netRating.toFixed(2) + '</span></td>' +
+          '<td class="num"><span class="num-cell" style="color:' + R.netRatingColor(e.netRating) + ';font-weight:700;">' + e.netRating.toFixed(2) + '</span></td>' +
           '<td class="num"><span class="num-cell">' + e.pointsPerBattle.toFixed(2) + '</span></td></tr>';
         if (isOpen) {
           rowHTML += '<tr class="build-detail-row"><td colspan="' + colCount + '" style="padding:0;background:var(--bg-elevated);">' + buildDetailHTML(e) + '</td></tr>';
