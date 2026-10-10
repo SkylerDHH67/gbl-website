@@ -123,6 +123,34 @@
       '<div style="display:flex;flex-wrap:wrap;gap:6px;">' + legend + '</div>';
   }
 
+  // Determines the site's one current/active stage: whichever stage has
+  // the most recent real match across ALL players (the strongest signal -
+  // "where is actual play happening right now"), falling back to whichever
+  // stage belongs to a season marked "active" in Settings/Config (highest
+  // stage order) only when no matches exist anywhere yet. Shared so "is
+  // this player's last stage the current one" means the same thing on
+  // every page, rather than each page guessing its own definition of
+  // "active" (a per-player most-recent-match check doesn't tell you
+  // whether that stage itself is still ongoing league-wide).
+  function pickCurrentStageId(data) {
+    var lastDateByStage = {};
+    (data.matches || []).forEach(function (m) {
+      var t = new Date(m.date).getTime();
+      if (!isNaN(t) && (!lastDateByStage[m.stageId] || t > lastDateByStage[m.stageId])) lastDateByStage[m.stageId] = t;
+    });
+    var stageIds = Object.keys(lastDateByStage);
+    if (stageIds.length) {
+      stageIds.sort(function (a, b) { return lastDateByStage[b] - lastDateByStage[a]; });
+      return stageIds[0];
+    }
+    var activeStageIds = Object.keys(data.stages || {}).filter(function (id) {
+      var st = data.stages[id];
+      return st.seasonId && data.seasonStatus[st.seasonId] && String(data.seasonStatus[st.seasonId]).toLowerCase() === "active";
+    });
+    activeStageIds.sort(function (a, b) { return (data.stages[b].order || 0) - (data.stages[a].order || 0); });
+    return activeStageIds[0] || null;
+  }
+
   // Which of a build's three slots is the Blade - identified by role, not
   // position (shared by Builds page and Stats Lab).
   function bladeSlotOf(build) {
@@ -193,6 +221,7 @@
     statusBadge: statusBadge, buildLabel: buildLabel,
     FINISH_LABELS: FINISH_LABELS, FINISH_COLORS: FINISH_COLORS, FINISH_ORDER: FINISH_ORDER,
     finishBarHTML: finishBarHTML, bladeSlotOf: bladeSlotOf, fullBuildLabel: fullBuildLabel,
-    formatRatchetName: formatRatchetName, buildLabelOrFallback: buildLabelOrFallback
+    formatRatchetName: formatRatchetName, buildLabelOrFallback: buildLabelOrFallback,
+    pickCurrentStageId: pickCurrentStageId
   };
 })();

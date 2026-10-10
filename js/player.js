@@ -30,8 +30,12 @@
     });
     var currentRow = sortedRows.length ? sortedRows[0] : null;
     var currentStage = currentRow ? data.stages[currentRow.stageId] : null;
-    var stageIsActive = !!(currentStage && currentStage.seasonId && data.seasonStatus[currentStage.seasonId] &&
-      String(data.seasonStatus[currentStage.seasonId]).toLowerCase() === "active");
+    // "Active" means this player's last stage IS the site's one current
+    // stage (same definition the homepage uses: whichever stage has the
+    // most recent match league-wide) - not merely whether their season has
+    // some status flag set, which was the previous (buggy) check and could
+    // say "NOT ACTIVE" even for a player currently playing in Group Stage.
+    var stageIsActive = !!(currentRow && currentRow.stageId === R.pickCurrentStageId(data));
     var stageLabel = currentStage ? ((data.seasons[currentStage.seasonId] || "") + " — " + (currentStage.name || currentRow.stageId)) : (currentRow ? currentRow.stageId : "—");
 
     var latestElo = rows.length ? rows[0].elo : null; // Elo is season-wide, identical across every stage row for this player
@@ -50,11 +54,11 @@
       (player.bio ? '<p class="section-sub" style="margin-top:8px;">' + U.esc(player.bio) + '</p>' : '') + '</div></div>';
 
     html += '<div class="grid grid-4" style="margin-top:20px;">' +
-      '<div class="stat-card"><div class="label">Record' + (currentRow && !stageIsActive ? ' <span style="color:var(--text-faint);font-weight:400;">(stage inactive)</span>' : '') + '</div><div class="value">' + (currentRow ? currentRow.wins + '-' + currentRow.losses : "—") + '</div></div>' +
+      '<div class="stat-card"><div class="label">Record</div><div class="value">' + (currentRow ? currentRow.wins + '-' + currentRow.losses : "—") + '</div></div>' +
       '<div class="stat-card"><div class="label">Elo</div><div class="value">' + (latestElo !== null ? Math.round(latestElo) : "—") + '</div></div>' +
       '<div class="stat-card"><div class="label">GBL Win Rating</div><div class="value">' + (currentRating !== null ? currentRating.toFixed(3) : "—") + '</div></div>' +
       '<div class="stat-card"><div class="label">Last Stage</div><div class="value" style="font-size:1rem;">' + U.esc(stageLabel) + '</div>' +
-      (currentRow ? '<div style="margin-top:4px;"><span class="badge' + (stageIsActive ? " live" : "") + '">' + (stageIsActive ? '<span class="dot"></span>ACTIVE' : "NOT ACTIVE") + '</span></div>' : '') + '</div>' +
+      (stageIsActive ? '<div style="margin-top:4px;"><span class="badge live"><span class="dot"></span>ACTIVE</span></div>' : '') + '</div>' +
       '</div>';
 
     if (rows.length) {
