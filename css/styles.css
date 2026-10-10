@@ -141,6 +141,14 @@ img{ max-width: 100%; display: block; }
   background: linear-gradient(90deg, var(--arc), var(--gold), var(--spin));
 }
 .site-header .bar{ display:flex; align-items:center; justify-content:space-between; height: 64px; }
+.header-meta-row{ border-top: 1px solid var(--line-soft); }
+.header-meta-strip{
+  padding: 5px 0; font-family: var(--data); font-size: 0.72rem; color: var(--text-faint);
+  letter-spacing: 0.02em; text-align: right;
+}
+.header-meta-strip strong{ color: var(--gold-bright); font-weight: 600; }
+.header-meta-strip .dot-sep{ opacity: 0.5; margin: 0 2px; }
+@media (max-width: 640px){ .header-meta-strip{ text-align: left; font-size: 0.68rem; } }
 .brand{ display:flex; align-items:center; gap:10px; font-family: var(--display); font-weight:700; font-size: 1.2rem; letter-spacing: 0.01em; }
 .brand-mark{
   width: 38px; height: 38px; border-radius: 50%;
@@ -211,6 +219,21 @@ a.panel:hover{ border-color: var(--arc); transform: translateY(-2px); box-shadow
 @media (max-width: 960px){ .grid-3, .grid-4{ grid-template-columns: repeat(2,1fr); } }
 @media (max-width: 620px){ .grid-2, .grid-3, .grid-4{ grid-template-columns: 1fr; } }
 
+/* Player directory cards - fixed avatar size + truncated text so one
+   player's long name/country can never stretch their card bigger than
+   the others in the grid (a flex child needs min-width:0 or it grows to
+   fit its content instead of respecting the grid column). */
+.player-card{ display:flex; gap:14px; align-items:center; height: 100%; }
+.player-card-avatar{
+  width:64px; height:64px; min-width:64px; min-height:64px; flex-shrink:0;
+  border-radius:50%; object-fit:cover; background: var(--bg-elevated); border:1px solid var(--line);
+  display:flex; align-items:center; justify-content:center; font-size:1.3rem; font-weight:700;
+}
+.player-card-body{ min-width:0; flex:1; }
+.player-card-name{ font-weight:700; font-family:var(--display); font-size:1.05rem; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.player-card-rating{ font-size:0.8rem; color: var(--text-dim); margin-top:3px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.player-card-body .subtle-country{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+
 .stat-card{ background: var(--bg-card); border:1px solid var(--line); border-radius: var(--radius); padding: 16px; }
 .stat-card .label{ font-family: var(--data); font-size: 0.68rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-faint); margin-bottom: 6px; }
 .stat-card .value{ font-family: var(--display); font-size: 1.7rem; font-weight: 700; }
@@ -244,6 +267,16 @@ td.num, th.num{ text-align:right; font-family: var(--data); }
 .player-cell{ display:flex; align-items:center; gap:8px; font-weight:600; }
 .player-cell .flag{ font-size: 1rem; }
 .player-avatar{ width:26px; height:26px; border-radius:50%; background: var(--bg-elevated); border:1px solid var(--line); object-fit: cover; }
+
+/* Small fixed-size badge logo used inline next to a player's name in
+   tables and matchup rows (standings, upcoming matches). Deliberately
+   small and circular - a wordmark would be too wide for a dense row. */
+.player-logo{ width:22px; height:22px; min-width:22px; border-radius:50%; object-fit:cover; background: var(--bg-elevated); border:1px solid var(--line); flex-shrink:0; }
+.player-cell-logo{ gap:9px; }
+
+/* Two-logo "A vs B" matchup row, used on Upcoming Matches. */
+.matchup-faces{ display:flex; align-items:center; gap:7px; }
+.matchup-faces .player-logo{ width:24px; height:24px; min-width:24px; }
 
 /* ---------------------------------------------------------
    States: loading / error / empty
@@ -323,6 +356,27 @@ select, input[type="text"], input[type="search"]{
   .hero-crest-wrap{ width: 86px; height: 86px; }
   .hero-crest{ width: 78px; height: 78px; }
 }
+
+/* Season + "today" indicator - a quiet strip under the hero copy so the
+   site always visibly reads as current/maintained, without competing
+   with the eyebrow/title above it. */
+.hero-meta{ display:flex; flex-wrap:wrap; gap: 8px 14px; margin-top: 12px; font-family: var(--data); font-size: 0.78rem; color: var(--text-faint); }
+.hero-meta strong{ color: var(--text-dim); font-weight:600; }
+.hero-meta .dot-sep{ opacity: 0.5; }
+
+/* Prominent YouTube callout - pulled from Site Content (feed_media),
+   so it only appears once the league admin adds a row for it. Red
+   accent deliberately doubles as "GBL red" and "YouTube red". */
+.youtube-callout{
+  display:flex; align-items:center; gap:12px; margin-top: 18px;
+  padding: 12px 16px; border-radius: var(--radius); border:1px solid rgba(239,62,74,0.35);
+  background: rgba(239,62,74,0.08); transition: border-color 0.15s ease, transform 0.15s ease;
+}
+.youtube-callout:hover{ border-color: var(--spin); transform: translateY(-1px); }
+.youtube-callout .yt-icon{ width:34px; height:34px; border-radius:50%; background: var(--spin); color:#fff; display:flex; align-items:center; justify-content:center; flex-shrink:0; font-size:1rem; }
+.youtube-callout .yt-copy{ min-width:0; }
+.youtube-callout .yt-title{ font-weight:700; color: var(--text); font-size:0.92rem; }
+.youtube-callout .yt-sub{ font-size:0.78rem; color: var(--text-faint); margin-top:1px; }
 
 .module-grid{ display:grid; grid-template-columns: 2fr 1fr; gap: 20px; margin: 28px 0; }
 @media (max-width: 860px){ .module-grid{ grid-template-columns: 1fr; } }

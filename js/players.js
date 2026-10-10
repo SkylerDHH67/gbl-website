@@ -6,16 +6,16 @@
   function card(p, ratingByPlayer) {
     var rating = ratingByPlayer[p.playerId];
     var avatar = p.badgeLogoUrl
-      ? '<img class="player-avatar" style="width:64px;height:64px;" src="' + U.esc(p.badgeLogoUrl) + '" alt="" onerror="this.style.display=\'none\'">'
-      : '<div class="player-avatar" style="width:64px;height:64px;display:flex;align-items:center;justify-content:center;font-size:1.3rem;font-weight:700;">' + U.esc((p.displayName || "?").slice(0,1).toUpperCase()) + '</div>';
+      ? '<img class="player-card-avatar" src="' + U.esc(p.badgeLogoUrl) + '" alt="" onerror="this.style.display=\'none\'">'
+      : '<div class="player-card-avatar">' + U.esc((p.displayName || "?").slice(0, 1).toUpperCase()) + '</div>';
     var countryLine = (p.flagEmoji || p.country)
       ? '<div class="subtle-country">' + (p.flagEmoji ? '<span class="flag">' + U.esc(p.flagEmoji) + '</span>' : '') + U.esc(p.country || "") + '</div>'
       : '';
-    return '<a class="panel" style="display:flex;gap:14px;align-items:center;" href="player.html?id=' + encodeURIComponent(p.playerId) + '">' +
+    return '<a class="panel player-card" href="player.html?id=' + encodeURIComponent(p.playerId) + '">' +
       avatar +
-      '<div><div style="font-weight:700;font-family:var(--display);font-size:1.05rem;">' + U.esc(p.displayName) + '</div>' +
+      '<div class="player-card-body"><div class="player-card-name">' + U.esc(p.displayName) + '</div>' +
       countryLine +
-      (rating !== undefined ? '<div style="font-size:0.8rem;color:var(--text-dim);margin-top:3px;">Rating ' + rating.toFixed(3) + '</div>' : '') + '</div></a>';
+      (rating !== undefined ? '<div class="player-card-rating">Rating ' + rating.toFixed(3) + '</div>' : '') + '</div></a>';
   }
 
   function render(players, ratingByPlayer) {

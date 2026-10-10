@@ -11,10 +11,31 @@
     if (!player) { el.innerHTML = R.emptyBlock("Player not found", "This player may be inactive or the link may be out of date."); return; }
 
     var rows = data.standings.filter(function (s) { return s.playerId === playerId; });
-    var totalWins = rows.reduce(function (a, r) { return a + r.wins; }, 0);
-    var totalLosses = rows.reduce(function (a, r) { return a + r.losses; }, 0);
+
+    // "Current" stage = whichever stage row has the most recent match date
+    // for this player; falls back to stage order when no dated matches
+    // exist yet. Record/GBL Rating below reflect only this stage - not a
+    // sum across every stage the player has ever appeared in - per
+    // Skyler's request that the profile reflect "now", not career totals.
+    var lastDateByStage = {};
+    data.matches.filter(function (m) { return m.playerAId === playerId || m.playerBId === playerId; }).forEach(function (m) {
+      var t = new Date(m.date).getTime();
+      if (!isNaN(t) && (!lastDateByStage[m.stageId] || t > lastDateByStage[m.stageId])) lastDateByStage[m.stageId] = t;
+    });
+    var sortedRows = rows.slice().sort(function (a, b) {
+      var ta = lastDateByStage[a.stageId], tb = lastDateByStage[b.stageId];
+      if (ta !== undefined || tb !== undefined) return (tb || 0) - (ta || 0);
+      var sa = data.stages[a.stageId], sb = data.stages[b.stageId];
+      return ((sb && sb.order) || 0) - ((sa && sa.order) || 0);
+    });
+    var currentRow = sortedRows.length ? sortedRows[0] : null;
+    var currentStage = currentRow ? data.stages[currentRow.stageId] : null;
+    var stageIsActive = !!(currentStage && currentStage.seasonId && data.seasonStatus[currentStage.seasonId] &&
+      String(data.seasonStatus[currentStage.seasonId]).toLowerCase() === "active");
+    var stageLabel = currentStage ? ((data.seasons[currentStage.seasonId] || "") + " — " + (currentStage.name || currentRow.stageId)) : (currentRow ? currentRow.stageId : "—");
+
     var latestElo = rows.length ? rows[0].elo : null; // Elo is season-wide, identical across every stage row for this player
-    var bestRating = rows.length ? Math.max.apply(null, rows.map(function (r) { return r.gblRating; })) : null;
+    var currentRating = currentRow ? currentRow.gblRating : null;
 
     var avatar = player.badgeLogoUrl
       ? '<img src="' + U.esc(player.badgeLogoUrl) + '" style="width:120px;height:120px;border-radius:50%;object-fit:cover;border:2px solid var(--line);box-shadow:0 0 0 4px rgba(95,216,236,0.08);" onerror="this.style.display=\'none\'">'
@@ -29,10 +50,11 @@
       (player.bio ? '<p class="section-sub" style="margin-top:8px;">' + U.esc(player.bio) + '</p>' : '') + '</div></div>';
 
     html += '<div class="grid grid-4" style="margin-top:20px;">' +
-      '<div class="stat-card"><div class="label">Record</div><div class="value">' + totalWins + '-' + totalLosses + '</div></div>' +
+      '<div class="stat-card"><div class="label">Record' + (currentRow && !stageIsActive ? ' <span style="color:var(--text-faint);font-weight:400;">(stage inactive)</span>' : '') + '</div><div class="value">' + (currentRow ? currentRow.wins + '-' + currentRow.losses : "—") + '</div></div>' +
       '<div class="stat-card"><div class="label">Elo</div><div class="value">' + (latestElo !== null ? Math.round(latestElo) : "—") + '</div></div>' +
-      '<div class="stat-card"><div class="label">Best GBL Rating</div><div class="value">' + (bestRating !== null ? bestRating.toFixed(3) : "—") + '</div></div>' +
-      '<div class="stat-card"><div class="label">Stages Played</div><div class="value">' + rows.length + '</div></div>' +
+      '<div class="stat-card"><div class="label">GBL Win Rating</div><div class="value">' + (currentRating !== null ? currentRating.toFixed(3) : "—") + '</div></div>' +
+      '<div class="stat-card"><div class="label">Last Stage</div><div class="value" style="font-size:1rem;">' + U.esc(stageLabel) + '</div>' +
+      (currentRow ? '<div style="margin-top:4px;"><span class="badge' + (stageIsActive ? " live" : "") + '">' + (stageIsActive ? '<span class="dot"></span>ACTIVE' : "NOT ACTIVE") + '</span></div>' : '') + '</div>' +
       '</div>';
 
     if (rows.length) {

@@ -44,6 +44,38 @@
     return '<a class="player-cell" href="player.html?id=' + encodeURIComponent(player.playerId) + '">' + flag + U.esc(player.displayName) + "</a>";
   }
 
+  // Small inline badge <img> for a player, or "" if there's no badge to
+  // show (no match / no logo URL) - callers can just concatenate this in,
+  // no need to branch on it. Badge, not wordmark: this is for dense rows
+  // (standings, matchup lists) where a wide wordmark wouldn't fit well.
+  function playerLogoHTML(player) {
+    if (!player || !player.badgeLogoUrl) return "";
+    return '<img class="player-logo" src="' + U.esc(player.badgeLogoUrl) + '" alt="" loading="lazy" onerror="this.remove()">';
+  }
+
+  // Player cell with a small badge logo to the left of the name (falls
+  // back to just the name + flag if there's no logo).
+  function playerCellWithLogoHTML(player) {
+    if (!player) return "—";
+    var flag = player.flagEmoji ? '<span class="flag">' + U.esc(player.flagEmoji) + "</span>" : "";
+    return '<a class="player-cell player-cell-logo" href="player.html?id=' + encodeURIComponent(player.playerId) + '">' +
+      playerLogoHTML(player) + flag + U.esc(player.displayName) + "</a>";
+  }
+
+  // Matches free-text names (e.g. from the manual Upcoming Matches tab)
+  // against the real Players list, case/whitespace-insensitive. Used
+  // where there's no player_id to look up by. Returns undefined if no
+  // confident match is found - callers should degrade gracefully (no
+  // logo, plain text name) rather than guess.
+  function playerLookupByName(players) {
+    var byName = {};
+    (players || []).forEach(function (p) {
+      var key = String(p.displayName || "").trim().toLowerCase();
+      if (key) byName[key] = p;
+    });
+    return function (name) { return byName[String(name || "").trim().toLowerCase()]; };
+  }
+
   function resultBadge(wonByA, aOrB) {
     var won = aOrB === "A" ? wonByA : !wonByA;
     return '<span class="badge ' + (won ? "win" : "loss") + '">' + (won ? "W" : "L") + "</span>";
@@ -65,7 +97,9 @@
 
   window.APP_RENDER = {
     loadingBlock: loadingBlock, errorBlock: errorBlock, emptyBlock: emptyBlock,
-    playerLookup: playerLookup, playerCellHTML: playerCellHTML, resultBadge: resultBadge,
+    playerLookup: playerLookup, playerLookupByName: playerLookupByName,
+    playerCellHTML: playerCellHTML, playerCellWithLogoHTML: playerCellWithLogoHTML,
+    playerLogoHTML: playerLogoHTML, resultBadge: resultBadge,
     statusBadge: statusBadge, buildLabel: buildLabel
   };
 })();

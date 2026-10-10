@@ -34,6 +34,7 @@
   function render(data, lookup) {
     var el = document.getElementById("matches-table");
     var rows = combinedRows(data);
+    var byName = R.playerLookupByName(data.players);
     var all = [];
     if (filter !== "completed") all = all.concat(rows.upcoming);
     if (filter !== "upcoming") all = all.concat(rows.completed.sort(function (a, b) { return new Date(b.date) - new Date(a.date); }));
@@ -43,7 +44,10 @@
       all.map(function (r) {
         var matchup, score = (r.scoreA === null || r.scoreA === undefined) ? "—" : (r.scoreA + "–" + r.scoreB);
         if (r.isManual) {
-          matchup = U.esc(r.playerAName) + ' <span style="color:var(--text-faint)">vs</span> ' + U.esc(r.playerBName) +
+          var manA = byName(r.playerAName), manB = byName(r.playerBName);
+          matchup = '<div class="matchup-faces">' + R.playerLogoHTML(manA) +
+            '<span>' + U.esc(r.playerAName) + ' <span style="color:var(--text-faint)">vs</span> ' + U.esc(r.playerBName) + '</span>' +
+            R.playerLogoHTML(manB) + '</div>' +
             (r.note ? '<div style="font-size:0.78rem;color:var(--text-faint);font-style:italic;margin-top:2px;">' + U.esc(r.note) + "</div>" : "");
         } else {
           var a = lookup(r.playerAId), b = lookup(r.playerBId);
