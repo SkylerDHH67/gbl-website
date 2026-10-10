@@ -9,15 +9,19 @@
   var filterBladePartId = "";
   var sortKey = "timesUsed";
   var sortDir = "desc"; // "asc" | "desc"
+  var expandedBuildId = null; // only one build detail open at a time
 
   var COLUMNS = [
     { key: "build", label: "Build", sortable: true },
     { key: "player", label: "Player", sortable: true },
     { key: "timesUsed", label: "Used", num: true, sortable: true },
     { key: "timesWon", label: "Won", num: true, sortable: true },
+    { key: "timesLost", label: "Lost", num: true, sortable: true },
     { key: "winRate", label: "Win Rate", num: true, sortable: true },
+    { key: "pointsScored", label: "Pts Scored", num: true, sortable: true },
     { key: "pointsPerBattle", label: "Pts/Battle", num: true, sortable: true }
   ];
+
 
   function partsLookup(parts) {
     var byId = {};
@@ -84,8 +88,22 @@
       bladePartId: slot ? slot.pid : "",
       bladeName: bladePart ? bladePart.displayName : "",
       playerName: playerLookup(r.playerId).displayName,
-      timesUsed: r.timesUsed, timesWon: r.timesWon, winRate: r.winRate, pointsPerBattle: r.pointsPerBattle
+      timesUsed: r.timesUsed, timesWon: r.timesWon, timesLost: Math.max(0, r.timesUsed - r.timesWon),
+      winRate: r.winRate, pointsScored: r.pointsScored, pointsPerBattle: r.pointsPerBattle,
+      finishDistribution: r.finishDistribution || {}
     };
+  }
+
+  function buildDetailHTML(e) {
+    return '<div style="padding:14px 16px;">' +
+      '<div class="eyebrow" style="margin-bottom:10px;">Finish Breakdown — ' + U.esc(e.label) + '</div>' +
+      R.finishBarHTML(e.finishDistribution) +
+      '<div style="display:flex;gap:22px;flex-wrap:wrap;margin-top:14px;font-size:0.85rem;color:var(--text-dim);">' +
+      '<span><strong style="color:var(--text);">' + U.pct(e.winRate) + '</strong> win rate</span>' +
+      '<span><strong style="color:var(--text);">' + e.pointsScored + '</strong> pts scored</span>' +
+      '<span><strong style="color:var(--text);">' + e.pointsPerBattle.toFixed(2) + '</strong> pts/battle</span>' +
+      '<span><strong style="color:var(--text);">' + e.timesWon + '-' + e.timesLost + '</strong> battle record</span>' +
+      '</div></div>';
   }
 
   function sortRows(rows) {
@@ -135,18 +153,27 @@
     }
 
     var rows = sortRows(filtered);
+    var colCount = COLUMNS.length;
 
     el.innerHTML = '<div class="table-wrap"><table class="data-table"><thead>' + renderHeaderRow() + '</thead><tbody>' +
       rows.map(function (e) {
         var img = bladeImageHTML(e.build, partsById);
         var lowSample = e.timesUsed < LOW_SAMPLE_THRESHOLD;
         var sampleBadge = lowSample ? '<span class="badge" title="Small sample size">n&lt;' + LOW_SAMPLE_THRESHOLD + '</span>' : '';
-        return '<tr><td><span class="build-cell">' + img + '<span style="font-family:var(--data)">' + U.esc(e.label) + '</span></span></td>' +
+        var isOpen = expandedBuildId === e.raw.buildId;
+        var rowHTML = '<tr class="build-row" data-build-id="' + U.esc(e.raw.buildId) + '" style="cursor:pointer;">' +
+          '<td><span class="build-cell"><span class="sort-arrow" style="opacity:0.5;">' + (isOpen ? "▾" : "▸") + '</span>' + img + '<span style="font-family:var(--data)">' + U.esc(e.label) + '</span></span></td>' +
           '<td>' + U.esc(e.playerName) + '</td>' +
           '<td class="num"><span class="num-cell">' + sampleBadge + e.timesUsed + '</span></td>' +
           '<td class="num"><span class="num-cell">' + e.timesWon + '</span></td>' +
+          '<td class="num"><span class="num-cell">' + e.timesLost + '</span></td>' +
           '<td class="num"><span class="num-cell">' + U.pct(e.winRate) + '</span></td>' +
+          '<td class="num"><span class="num-cell">' + e.pointsScored + '</span></td>' +
           '<td class="num"><span class="num-cell">' + e.pointsPerBattle.toFixed(2) + '</span></td></tr>';
+        if (isOpen) {
+          rowHTML += '<tr class="build-detail-row"><td colspan="' + colCount + '" style="padding:0;background:var(--bg-elevated);">' + buildDetailHTML(e) + '</td></tr>';
+        }
+        return rowHTML;
       }).join("") + "</tbody></table></div>";
 
     el.querySelectorAll("th.sortable").forEach(function (th) {
@@ -158,6 +185,14 @@
           sortKey = key;
           sortDir = "desc";
         }
+        render(data);
+      });
+    });
+
+    el.querySelectorAll("tr.build-row").forEach(function (tr) {
+      tr.addEventListener("click", function () {
+        var id = tr.getAttribute("data-build-id");
+        expandedBuildId = expandedBuildId === id ? null : id;
         render(data);
       });
     });

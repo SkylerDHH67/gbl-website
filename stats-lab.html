@@ -32,15 +32,29 @@
     <div class="eyebrow">Exploratory Statistics</div>
     <h1 class="page-title">Stats Lab</h1>
   </div>
-  <div class="panel"><div class="state-block"><div class="icon">🧪</div><div class="title">Coming soon</div><div>The full Stats Lab — filterable by player, opponent, season, stage, blade, ratchet, bit, full build, finish type, and date range — is a deeper build planned for a follow-up update, so it gets the filtering architecture it deserves rather than a rushed version. In the meantime, the <a href="builds.html" style="color:var(--arc-bright)">Builds page</a> already shows real usage and win-rate data for every build that has actually been played.</div></div></div>
+  <p class="section-sub">Filter real battle-level data across player, opponent, season, stage, build, and finish type - combine as many as you like. Small sample sizes are flagged, not hidden.</p>
+
+  <div class="filter-bar">
+    <select id="sl-player"><option value="">Player — any</option></select>
+    <select id="sl-opponent"><option value="">Opponent — any</option></select>
+    <select id="sl-season"><option value="">Season — any</option></select>
+    <select id="sl-stage"><option value="">Stage — any</option></select>
+    <select id="sl-build"><option value="">Build — any</option></select>
+    <select id="sl-finish"><option value="">Finish type — any</option></select>
+  </div>
+
+  <div id="sl-results"><div class="skeleton skeleton-row"></div><div class="skeleton skeleton-row"></div></div>
 </main>
 
 <footer class="site-footer"><div class="wrap footer-brand-row"><img class="footer-mark" src="images/league/gbl-logo-badge.png" alt="GBL"><span>Global Blade League</span></div></footer>
 <script src="js/config.js"></script>
 <script src="js/utils.js"></script>
+<script src="js/data.js"></script>
+<script src="js/render.js"></script>
 <script src="js/nav.js"></script>
 <script src="js/footer-social.js"></script>
 <script src="js/header-meta.js"></script>
 <script src="js/kinetic.js"></script>
+<script src="js/stats-lab.js"></script>
 </body>
 </html>

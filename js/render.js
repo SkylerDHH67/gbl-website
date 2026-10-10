@@ -95,11 +95,67 @@
     return part.displayName + (part.system ? " (" + part.system + ")" : "");
   }
 
+  // Shared finish-type display labeling. Battle Event Log / Stats Lab
+  // Source store finish_type as the engine's uppercase key (SPIN/OVER/
+  // BURST/XTREME) - this is purely presentation, not a new data source.
+  // Reused by both the Builds page (per-build detail) and Stats Lab
+  // (filtered finish distribution) so the two never drift apart.
+  var FINISH_LABELS = { SPIN: "Spin", OVER: "Over", BURST: "Burst", XTREME: "Xtreme" };
+  var FINISH_COLORS = { SPIN: "var(--arc)", OVER: "var(--gold)", BURST: "var(--spin)", XTREME: "var(--arc-bright)" };
+  var FINISH_ORDER = ["SPIN", "OVER", "BURST", "XTREME"];
+
+  // Renders a flow-bar-style stacked horizontal bar from a { SPIN: n,
+  // OVER: n, ... } count map, plus a legend with counts and percentages.
+  function finishBarHTML(dist) {
+    dist = dist || {};
+    var total = FINISH_ORDER.reduce(function (sum, k) { return sum + (dist[k] || 0); }, 0);
+    if (!total) return '<div class="state-block" style="padding:14px;"><span class="title">No finish data for this filter</span></div>';
+    var segments = FINISH_ORDER.filter(function (k) { return dist[k] > 0; }).map(function (k) {
+      var pct = (dist[k] / total) * 100;
+      return '<span style="width:' + pct.toFixed(1) + '%;background:' + FINISH_COLORS[k] + ';display:block;height:100%;"></span>';
+    }).join("");
+    var legend = FINISH_ORDER.filter(function (k) { return dist[k] > 0; }).map(function (k) {
+      var pct = Math.round((dist[k] / total) * 100);
+      return '<span class="badge" style="border-color:' + FINISH_COLORS[k] + '33;">' +
+        '<span class="dot" style="background:' + FINISH_COLORS[k] + '"></span>' + FINISH_LABELS[k] + ' ' + dist[k] + ' (' + pct + '%)</span>';
+    }).join(" ");
+    return '<div class="flow-bar" style="height:14px;margin-bottom:10px;">' + segments + '</div>' +
+      '<div style="display:flex;flex-wrap:wrap;gap:6px;">' + legend + '</div>';
+  }
+
+  // Which of a build's three slots is the Blade - identified by role, not
+  // position (shared by Builds page and Stats Lab).
+  function bladeSlotOf(build) {
+    if (!build) return null;
+    var slots = [
+      { pid: build.slot1PartId, role: build.slot1Role },
+      { pid: build.slot2PartId, role: build.slot2Role },
+      { pid: build.slot3PartId, role: build.slot3Role }
+    ];
+    return slots.filter(function (s) { return String(s.role || "").toLowerCase() === "blade" && s.pid; })[0] || null;
+  }
+
+  // Composes "Shatter Horus / 1-60 / Hexa" from a build's three slots in
+  // slot order. Returns null if the build itself isn't resolvable (older/
+  // test build not in the Builds feed) so callers can fall back to the
+  // bare build_id.
+  function fullBuildLabel(build, partsById) {
+    if (!build) return null;
+    var slots = [build.slot1PartId, build.slot2PartId, build.slot3PartId].filter(Boolean);
+    if (!slots.length) return null;
+    return slots.map(function (pid) {
+      var p = partsById[pid];
+      return (p && p.displayName) || pid;
+    }).join(" / ");
+  }
+
   window.APP_RENDER = {
     loadingBlock: loadingBlock, errorBlock: errorBlock, emptyBlock: emptyBlock,
     playerLookup: playerLookup, playerLookupByName: playerLookupByName,
     playerCellHTML: playerCellHTML, playerCellWithLogoHTML: playerCellWithLogoHTML,
     playerLogoHTML: playerLogoHTML, resultBadge: resultBadge,
-    statusBadge: statusBadge, buildLabel: buildLabel
+    statusBadge: statusBadge, buildLabel: buildLabel,
+    FINISH_LABELS: FINISH_LABELS, FINISH_COLORS: FINISH_COLORS, FINISH_ORDER: FINISH_ORDER,
+    finishBarHTML: finishBarHTML, bladeSlotOf: bladeSlotOf, fullBuildLabel: fullBuildLabel
   };
 })();

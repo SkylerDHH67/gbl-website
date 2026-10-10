@@ -68,9 +68,59 @@
       html += '<div class="panel" style="margin-top:20px;">' + R.emptyBlock("No completed matches yet") + '</div>';
     }
 
-    html += '<div class="panel" style="margin-top:16px; color:var(--text-faint); font-size:0.85rem;">Build usage, matchup history, and deeper analytics for this player are part of the Stats Lab, coming in a later update.</div>';
+    html += dashboardHTML(data, playerId, currentRow);
 
     el.innerHTML = html;
+  }
+
+  var LOW_SAMPLE_THRESHOLD = 5;
+
+  // Turns a "WWLWL..." Last 10 string from the Standings feed into a row
+  // of win/loss dots - oldest first, left to right, matching how the
+  // string is written.
+  function formTrailHTML(last10) {
+    var s = String(last10 || "").toUpperCase().replace(/[^WL]/g, "");
+    if (!s) return '<span style="color:var(--text-faint);font-size:0.85rem;">No recent form yet</span>';
+    return s.split("").map(function (ch) {
+      return '<span class="badge ' + (ch === "W" ? "win" : "loss") + '" style="padding:3px 8px;min-width:22px;justify-content:center;">' + ch + '</span>';
+    }).join(" ");
+  }
+
+  function buildMiniTableHTML(title, rows, emptyMsg) {
+    if (!rows.length) return '<div><div class="eyebrow">' + U.esc(title) + '</div><div style="color:var(--text-faint);font-size:0.85rem;">' + U.esc(emptyMsg) + '</div></div>';
+    return '<div><div class="eyebrow">' + U.esc(title) + '</div><div class="table-wrap"><table class="data-table"><thead><tr><th>Build</th><th class="num">Used</th><th class="num">Win Rate</th></tr></thead><tbody>' +
+      rows.map(function (b) {
+        var low = b.timesUsed < LOW_SAMPLE_THRESHOLD ? '<span class="badge" title="Small sample size">n&lt;' + LOW_SAMPLE_THRESHOLD + '</span> ' : "";
+        return '<tr><td>' + U.esc(b.label) + '</td><td class="num"><span class="num-cell">' + low + b.timesUsed + '</span></td><td class="num"><span class="num-cell">' + U.pct(b.winRate) + '</span></td></tr>';
+      }).join("") + '</tbody></table></div></div>';
+  }
+
+  // Mini dashboard below the Season History table: recent form, most-used
+  // builds, and most-effective builds, all pulled from the same
+  // feed_build_stats data the Builds page itself is built from, filtered
+  // to this one player - no separate/duplicate data source.
+  function dashboardHTML(data, playerId, currentRow) {
+    var partsById = {}; (data.parts || []).forEach(function (p) { partsById[p.partId] = p; });
+    var buildsById = {}; (data.builds || []).forEach(function (b) { buildsById[b.buildId] = b; });
+
+    var myBuilds = data.buildStats.filter(function (b) { return b.playerId === playerId; }).map(function (b) {
+      return { buildId: b.buildId, label: R.fullBuildLabel(buildsById[b.buildId], partsById) || b.buildId, timesUsed: b.timesUsed, winRate: b.winRate };
+    });
+
+    var mostUsed = myBuilds.slice().sort(function (a, b) { return b.timesUsed - a.timesUsed; }).slice(0, 5);
+    var mostEffective = myBuilds.filter(function (b) { return b.timesUsed >= LOW_SAMPLE_THRESHOLD; })
+      .sort(function (a, b) { return b.winRate - a.winRate; }).slice(0, 5);
+
+    return '<section class="panel" style="margin-top:20px;">' +
+      '<h2 class="section-title">Recent Outlook</h2>' +
+      '<div class="eyebrow">Recent Form' + (currentRow ? "" : "") + '</div>' +
+      '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:18px;">' + formTrailHTML(currentRow && currentRow.last10) + '</div>' +
+      '<div class="grid grid-2">' +
+      buildMiniTableHTML("Most-Used Builds", mostUsed, "No build usage recorded yet.") +
+      buildMiniTableHTML("Most-Effective Builds", mostEffective, "Needs at least " + LOW_SAMPLE_THRESHOLD + " uses on a build before a reliable win rate shows here.") +
+      '</div>' +
+      '<p class="section-sub" style="margin-top:16px;margin-bottom:0;">Deeper matchup and head-to-head breakdowns for this player are available in the <a href="stats-lab.html" style="color:var(--arc-bright)">Stats Lab</a>.</p>' +
+      '</section>';
   }
 
   window.APP_DATA.loadAppData().then(function (data) {
