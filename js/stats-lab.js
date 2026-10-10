@@ -21,8 +21,16 @@
   var U = window.APP_UTILS, R = window.APP_RENDER;
   var LOW_SAMPLE_THRESHOLD = 5;
 
-  var filters = { player: "", opponent: "", season: "", stage: "", build: "", finish: "" };
+  var filters = { player: "", opponent: "", season: "", stage: "", build: "", blade: "", finish: "" };
   var APP_DATA = null;
+
+  // Resolves a build_id to its Blade part_id (shared shape with
+  // builds.js/render.js's bladeSlotOf) so the Blade filter can match
+  // battles/builds regardless of which Ratchet/Bit they were paired with.
+  function bladeOfBuild(buildId, buildsById) {
+    var slot = R.bladeSlotOf(buildsById[buildId]);
+    return slot ? slot.pid : "";
+  }
 
   function partsLookup(parts) {
     var byId = {};
@@ -93,10 +101,20 @@
     });
     populateSelect(document.getElementById("sl-build"), buildItems, function (i) { return i.label; });
 
+    var bladeIdsSeen = {};
+    Object.keys(buildIdsSeen).forEach(function (id) {
+      var pid = bladeOfBuild(id, buildsById);
+      if (pid) bladeIdsSeen[pid] = true;
+    });
+    var bladeItems = Object.keys(bladeIdsSeen).map(function (pid) {
+      return { value: pid, label: (partsById[pid] && partsById[pid].displayName) || pid };
+    });
+    populateSelect(document.getElementById("sl-blade"), bladeItems, function (i) { return i.label; });
+
     var finishItems = Object.keys(finishTypesSeen).map(function (k) { return { value: k, label: R.FINISH_LABELS[k] || k }; });
     populateSelect(document.getElementById("sl-finish"), finishItems, function (i) { return i.label; });
 
-    ["player", "opponent", "season", "stage", "build", "finish"].forEach(function (key) {
+    ["player", "opponent", "season", "stage", "build", "blade", "finish"].forEach(function (key) {
       document.getElementById("sl-" + key).addEventListener("change", function (e) {
         filters[key] = e.target.value;
         renderResults(data);
@@ -120,16 +138,15 @@
       if (filters.season && p.seasonId !== filters.season) return false;
       if (filters.stage && p.stageId !== filters.stage) return false;
       if (filters.build && p.buildId !== filters.build) return false;
+      if (filters.blade && bladeOfBuild(p.buildId, buildsById) !== filters.blade) return false;
       if (filters.finish && p.finishType !== filters.finish) return false;
       return true;
     });
 
     var player = playerLookup(filters.player);
-    var el = document.getElementById("sl-results");
 
     if (!participants.length) {
-      el.innerHTML = R.emptyBlock("No battles match these filters", "Try clearing the opponent, build, or finish type filter.");
-      return;
+      return R.emptyBlock("No battles match these filters", "Try clearing the opponent, build, blade, or finish type filter.");
     }
 
     var battles = participants.length;
@@ -184,7 +201,7 @@
       }
     }
 
-    el.innerHTML = '<h2 class="section-title">' + U.esc(player.displayName) + (filters.opponent ? " vs " + U.esc(playerLookup(filters.opponent).displayName) : "") + '</h2>' +
+    return '<h2 class="section-title">' + U.esc(player.displayName) + (filters.opponent ? " vs " + U.esc(playerLookup(filters.opponent).displayName) : "") + '</h2>' +
       statCardsHTML(cards) + h2h +
       '<div class="panel" style="margin-bottom:18px;"><div class="eyebrow">Finish Breakdown</div>' + R.finishBarHTML(dist) + '</div>' +
       buildRows;
@@ -198,13 +215,12 @@
       if (filters.stage && b.stageId !== filters.stage) return false;
       if (filters.finish && b.finishType !== filters.finish) return false;
       if (filters.build && b.buildIdA !== filters.build && b.buildIdB !== filters.build) return false;
+      if (filters.blade && bladeOfBuild(b.buildIdA, buildsById) !== filters.blade && bladeOfBuild(b.buildIdB, buildsById) !== filters.blade) return false;
       return true;
     });
 
-    var el = document.getElementById("sl-results");
     if (!battlesRows.length) {
-      el.innerHTML = R.emptyBlock("No battles match these filters", "Pick a player to see individual results, or clear a filter.");
-      return;
+      return R.emptyBlock("No battles match these filters", "Pick a player to see individual results, or clear a filter.");
     }
 
     var dist = {};
@@ -224,7 +240,7 @@
       return { label: R.buildLabelOrFallback(buildsById[id], partsById, id), used: s.used, won: s.won, winRate: s.used ? s.won / s.used : 0 };
     }).sort(function (a, b) { return b.used - a.used; }).slice(0, 15);
 
-    el.innerHTML = '<h2 class="section-title">League-wide</h2>' +
+    return '<h2 class="section-title">League-wide</h2>' +
       statCardsHTML([{ label: "Battles", value: battlesRows.length }, { label: "Distinct Builds Seen", value: Object.keys(byBuild).length }]) +
       '<div class="panel" style="margin-bottom:18px;"><div class="eyebrow">Finish Breakdown</div>' + R.finishBarHTML(dist) + '</div>' +
       '<h2 class="section-title">Top builds in this filter</h2><div class="table-wrap"><table class="data-table"><thead><tr><th>Build</th><th class="num">Used</th><th class="num">Won</th><th class="num">Win Rate</th></tr></thead><tbody>' +
@@ -234,12 +250,43 @@
       }).join("") + '</tbody></table></div><p class="section-sub" style="margin-top:14px;">Select a player above to see individual results, head-to-head, and per-battle detail.</p>';
   }
 
+  // "Which Ratchet/Bit combo does this Blade perform best with" - answered
+  // straight from the existing per-build league-wide stats (feed_build_stats),
+  // not from battle-level filtering, since it's inherently a cross-match
+  // question ("every build ever recorded with this blade") rather than
+  // something scoped to the player/season/stage filters above. This is
+  // deliberately NOT full deck/lineup analysis (which blade pairs with which
+  // other blades across a player's 3-build deck) - that needs deck-level
+  // data that isn't cleanly categorized yet, so it's left for later.
+  function bladeBreakdownHTML(data, partsById, buildsById) {
+    if (!filters.blade) return "";
+    var rows = (data.buildStats || []).filter(function (r) {
+      return bladeOfBuild(r.buildId, buildsById) === filters.blade;
+    }).map(function (r) {
+      return { label: R.buildLabelOrFallback(buildsById[r.buildId], partsById, r.buildId), used: r.timesUsed, winRate: r.winRate, netRating: r.netRating, pointsPerBattle: r.pointsPerBattle };
+    }).sort(function (a, b) { return b.winRate - a.winRate || b.used - a.used; });
+    if (!rows.length) return "";
+    var bladeName = (partsById[filters.blade] && partsById[filters.blade].displayName) || filters.blade;
+    return '<h2 class="section-title">Best builds for ' + U.esc(bladeName) + '</h2>' +
+      '<p class="section-sub">Every Ratchet/Bit combo recorded with this blade, ranked by win rate — league-wide, across all seasons and stages (not limited to the filters above).</p>' +
+      '<div class="table-wrap"><table class="data-table"><thead><tr><th>Build</th><th class="num">Used</th><th class="num">Win Rate</th><th class="num">Net Rating</th><th class="num">Pts/Battle</th></tr></thead><tbody>' +
+      rows.map(function (b) {
+        var low = b.used < LOW_SAMPLE_THRESHOLD ? '<span class="badge" title="Small sample size">n&lt;' + LOW_SAMPLE_THRESHOLD + '</span> ' : "";
+        return '<tr><td>' + U.esc(b.label) + '</td><td class="num"><span class="num-cell">' + low + b.used + '</span></td><td class="num"><span class="num-cell">' + U.pct(b.winRate) + '</span></td>' +
+          '<td class="num"><span class="num-cell" style="color:' + (b.netRating >= 1 ? "var(--arc-bright)" : "var(--spin)") + ';">' + b.netRating.toFixed(2) + '</span></td>' +
+          '<td class="num"><span class="num-cell">' + b.pointsPerBattle.toFixed(2) + '</span></td></tr>';
+      }).join("") + '</tbody></table></div>';
+  }
+
   function renderResults(data) {
     var partsById = partsLookup(data.parts);
     var buildsById = buildsLookup(data.builds);
     var playerLookup = R.playerLookup(data.players);
-    if (filters.player) renderPlayerMode(data, partsById, buildsById, playerLookup);
-    else renderLeagueMode(data, partsById, buildsById);
+    var mainHTML = filters.player
+      ? renderPlayerMode(data, partsById, buildsById, playerLookup)
+      : renderLeagueMode(data, partsById, buildsById);
+    var bladeHTML = bladeBreakdownHTML(data, partsById, buildsById);
+    document.getElementById("sl-results").innerHTML = mainHTML + (bladeHTML ? '<div style="margin-top:28px;">' + bladeHTML + '</div>' : "");
   }
 
   window.APP_DATA.loadAppData().then(function (data) {

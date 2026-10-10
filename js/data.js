@@ -32,7 +32,7 @@
     "baseline_points_per_battle", "participation_progress", "deck_a_build_ids",
     "deck_b_build_ids", "position_in_rotation", "insufficient_sample",
     "wordmark_logo_url", "target_score_override", "teammate_build_id",
-    "finish_distribution", "points_per_battle", "debut_season_id",
+    "loss_finish_distribution", "finish_distribution", "points_per_battle", "debut_season_id",
     "slot_1_part_id", "slot_1_role", "slot_2_part_id", "slot_2_role",
     "slot_3_part_id", "slot_3_role", "nickname",
     "badge_logo_url", "points_against", "duration_battles", "deck_build_ids",
@@ -247,13 +247,19 @@
     };
   }
 
-  function normalizeBuildStatsRow(raw) {
+  function parseFinishDist_(raw) {
     var dist = {};
-    (raw.finish_distribution || "").split(";").filter(Boolean).forEach(function (pair) {
+    (raw || "").split(";").filter(Boolean).forEach(function (pair) {
       var idx = pair.lastIndexOf(":");
       if (idx === -1) return;
       dist[pair.slice(0, idx)] = U.num(pair.slice(idx + 1));
     });
+    return dist;
+  }
+
+  function normalizeBuildStatsRow(raw) {
+    var dist = parseFinishDist_(raw.finish_distribution);
+    var lossDist = parseFinishDist_(raw.loss_finish_distribution);
     var pointsScored = U.num(raw.points_scored);
     var pointsAgainst = U.num(raw.points_against);
     // Net rating = points scored / points scored against - "is this build
@@ -266,7 +272,7 @@
       buildId: raw.build_id, playerId: raw.player_id, timesUsed: U.num(raw.times_used), timesWon: U.num(raw.times_won),
       pointsScored: pointsScored, pointsAgainst: pointsAgainst, netRating: Math.round(netRating * 100) / 100,
       pointsPerBattle: U.num(raw.points_per_battle), winRate: U.num(raw.win_rate),
-      finishDistribution: dist
+      finishDistribution: dist, lossFinishDistribution: lossDist
     };
   }
 

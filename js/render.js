@@ -123,6 +123,20 @@
       '<div style="display:flex;flex-wrap:wrap;gap:6px;">' + legend + '</div>';
   }
 
+  // Picks the highest-count entry out of a { SPIN: n, OVER: n, ... } map,
+  // e.g. for "most common way this build wins" / "most common way this
+  // build loses" callouts. Returns null for an empty/all-zero map rather
+  // than a misleading zero-count "winner".
+  function topFinish(dist) {
+    dist = dist || {};
+    var best = null;
+    FINISH_ORDER.forEach(function (k) {
+      var n = dist[k] || 0;
+      if (n > 0 && (!best || n > best.count)) best = { type: k, label: FINISH_LABELS[k], count: n };
+    });
+    return best;
+  }
+
   // Determines the site's one current/active stage: whichever stage has
   // the most recent real match across ALL players (the strongest signal -
   // "where is actual play happening right now"), falling back to whichever
@@ -220,7 +234,7 @@
     playerLogoHTML: playerLogoHTML, resultBadge: resultBadge,
     statusBadge: statusBadge, buildLabel: buildLabel,
     FINISH_LABELS: FINISH_LABELS, FINISH_COLORS: FINISH_COLORS, FINISH_ORDER: FINISH_ORDER,
-    finishBarHTML: finishBarHTML, bladeSlotOf: bladeSlotOf, fullBuildLabel: fullBuildLabel,
+    finishBarHTML: finishBarHTML, topFinish: topFinish, bladeSlotOf: bladeSlotOf, fullBuildLabel: fullBuildLabel,
     formatRatchetName: formatRatchetName, buildLabelOrFallback: buildLabelOrFallback,
     pickCurrentStageId: pickCurrentStageId
   };

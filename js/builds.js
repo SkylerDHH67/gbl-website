@@ -70,14 +70,24 @@
       timesUsed: r.timesUsed, timesWon: r.timesWon, timesLost: Math.max(0, r.timesUsed - r.timesWon),
       winRate: r.winRate, pointsScored: r.pointsScored, pointsAgainst: r.pointsAgainst, netRating: r.netRating,
       pointsPerBattle: r.pointsPerBattle,
-      finishDistribution: r.finishDistribution || {}
+      finishDistribution: r.finishDistribution || {},
+      lossFinishDistribution: r.lossFinishDistribution || {}
     };
   }
 
   function buildDetailHTML(e) {
+    var topWin = R.topFinish(e.finishDistribution);
+    var topLoss = R.topFinish(e.lossFinishDistribution);
+    var callouts = '<div style="display:flex;gap:22px;flex-wrap:wrap;margin-bottom:14px;">' +
+      (topWin ? '<div><div class="eyebrow" style="margin-bottom:4px;">Most Common Win</div><div style="font-family:var(--data);font-weight:700;color:var(--arc-bright);">' + U.esc(topWin.label) + ' Finish <span style="color:var(--text-faint);font-weight:400;">(' + topWin.count + ')</span></div></div>' : "") +
+      (topLoss ? '<div><div class="eyebrow" style="margin-bottom:4px;">Most Common Loss</div><div style="font-family:var(--data);font-weight:700;color:var(--spin);">' + U.esc(topLoss.label) + ' Finish <span style="color:var(--text-faint);font-weight:400;">(' + topLoss.count + ')</span></div></div>' : "") +
+      '</div>';
     return '<div style="padding:14px 16px;">' +
-      '<div class="eyebrow" style="margin-bottom:10px;">Finish Breakdown — ' + U.esc(e.label) + '</div>' +
+      callouts +
+      '<div class="eyebrow" style="margin-bottom:10px;">When ' + U.esc(e.label) + ' Wins</div>' +
       R.finishBarHTML(e.finishDistribution) +
+      '<div class="eyebrow" style="margin:16px 0 10px;">When ' + U.esc(e.label) + ' Loses</div>' +
+      R.finishBarHTML(e.lossFinishDistribution) +
       '<div style="display:flex;gap:22px;flex-wrap:wrap;margin-top:14px;font-size:0.85rem;color:var(--text-dim);">' +
       '<span><strong style="color:var(--text);">' + U.pct(e.winRate) + '</strong> win rate</span>' +
       '<span><strong style="color:var(--text);">' + e.pointsScored + '</strong> pts for</span>' +
