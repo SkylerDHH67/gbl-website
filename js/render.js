@@ -101,7 +101,7 @@
   // Reused by both the Builds page (per-build detail) and Stats Lab
   // (filtered finish distribution) so the two never drift apart.
   var FINISH_LABELS = { SPIN: "Spin", OVER: "Over", BURST: "Burst", XTREME: "Xtreme" };
-  var FINISH_COLORS = { SPIN: "var(--arc)", OVER: "var(--gold)", BURST: "var(--spin)", XTREME: "var(--arc-bright)" };
+  var FINISH_COLORS = { SPIN: "var(--arc)", OVER: "var(--gold)", BURST: "var(--spin)", XTREME: "var(--xtreme)" };
   var FINISH_ORDER = ["SPIN", "OVER", "BURST", "XTREME"];
 
   // Renders a flow-bar-style stacked horizontal bar from a { SPIN: n,

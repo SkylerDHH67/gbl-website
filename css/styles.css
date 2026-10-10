@@ -26,12 +26,14 @@
   --spin-bright: #ff6b74;
   --gold: #ffc53d;        /* brand gold - leaders, featured, hero energy, standout highlights */
   --gold-bright: #ffd873;
+  --xtreme: #39ff6a;      /* neon green - reserved for Xtreme Finish callouts (finish bars, battle tags) */
   --win: var(--gold);
   --loss: var(--spin);
 
   --glow-arc: rgba(95,216,236,0.35);
   --glow-gold: rgba(255,197,61,0.35);
   --glow-spin: rgba(239,62,74,0.35);
+  --glow-xtreme: rgba(57,255,106,0.35);
 
   --radius: 12px;
   --radius-sm: 7px;
