@@ -85,7 +85,7 @@
   // "how did the score actually move" view; the flow-bar elsewhere stays
   // the "who won each individual battle, sized by points" view - the two
   // are complementary, not duplicates.
-  function scoreLineSVG(realBattles, match, lookup) {
+  function scoreLineSVG(realBattles, match, lookup, buildsById, partsById) {
     var a = lookup(match.playerAId), b = lookup(match.playerBId);
     var n = realBattles.length;
     var maxScore = match.targetScore;
@@ -95,12 +95,27 @@
     function x(i) { return padL + (n === 0 ? 0 : (i / n) * plotW); }
     function y(v) { return padT + plotH - (v / maxScore) * plotH; }
     var ptsA = [[0, 0]], ptsB = [[0, 0]];
-    realBattles.forEach(function (e, i) { ptsA.push([i + 1, e.scoreAAfter]); ptsB.push([i + 1, e.scoreBAfter]); });
+    // index 0 has no battle behind it (match start) - titles array is kept
+    // one-indexed-by-offset so titles[i] lines up with ptsA[i]/ptsB[i].
+    var titles = ["Match start — 0–0"];
+    realBattles.forEach(function (e, i) {
+      ptsA.push([i + 1, e.scoreAAfter]); ptsB.push([i + 1, e.scoreBAfter]);
+      titles.push("Battle " + (i + 1) + ": " + battleSentenceText(e, match, lookup, buildsById, partsById) + " (" + e.scoreAAfter + "–" + e.scoreBAfter + ")");
+    });
     function toPath(pts) {
       return pts.map(function (p, idx) { return (idx === 0 ? "M" : "L") + x(p[0]).toFixed(1) + "," + y(p[1]).toFixed(1); }).join(" ");
     }
+    // Each dot carries a <title> (native hover/focus tooltip, no extra JS
+    // needed) naming the battle's finish, winner, build, and matchup, plus
+    // a transparent oversized hit-circle so the tooltip is easy to trigger
+    // on both desktop hover and mobile tap, not just the tiny 3.5px dot.
     function toDots(pts, color) {
-      return pts.map(function (p) { return '<circle cx="' + x(p[0]).toFixed(1) + '" cy="' + y(p[1]).toFixed(1) + '" r="3.5" fill="' + color + '"/>'; }).join("");
+      return pts.map(function (p, idx) {
+        var title = '<title>' + U.esc(titles[idx]) + '</title>';
+        var cx = x(p[0]).toFixed(1), cy = y(p[1]).toFixed(1);
+        return '<circle cx="' + cx + '" cy="' + cy + '" r="10" fill="transparent" style="cursor:pointer;">' + title + '</circle>' +
+          '<circle cx="' + cx + '" cy="' + cy + '" r="3.5" fill="' + color + '" style="pointer-events:none;"></circle>';
+      }).join("");
     }
     var targetY = y(match.targetScore).toFixed(1);
     return '<div style="display:flex;gap:16px;align-items:center;margin-bottom:8px;font-size:0.82rem;color:var(--text-dim);">' +
@@ -133,7 +148,7 @@
       '</div>';
   }
 
-  function renderSummary(match, lookup, timeline) {
+  function renderSummary(match, lookup, timeline, buildsById, partsById) {
     var a = lookup(match.playerAId), b = lookup(match.playerBId);
     var realBattles = timeline.filter(function (e) { return e.kind === "battle" && !e.isRedo; });
     var reshuffleCount = timeline.filter(function (e) { return e.kind === "reshuffle"; }).length;
@@ -146,7 +161,7 @@
       html += '<p style="font-size:1.05rem;">Match in progress — ' + match.finalScoreA + '–' + match.finalScoreB + '.</p>';
     }
     if (redoCount) html += '<p style="color:var(--text-faint);font-size:0.85rem;">' + redoCount + ' redo' + (redoCount === 1 ? "" : "s") + ' occurred during this match (Air Contact / No Contact) — these don\'t affect score and are shown in the Battle Log tab.</p>';
-    if (realBattles.length) html += scoreLineSVG(realBattles, match, lookup);
+    if (realBattles.length) html += scoreLineSVG(realBattles, match, lookup, buildsById, partsById);
     html += '</div>';
     document.getElementById("mc-summary").innerHTML = html;
   }
@@ -164,6 +179,19 @@
   // reads as a sentence rather than making someone cross-reference which
   // side's build won. Falls back gracefully if winnerPlayerId doesn't
   // match either side (shouldn't happen, but never crash the log over it).
+  // Shared plain-text version of the same sentence, used for SVG <title>
+  // tooltips (SVG titles are plain text, not HTML) and anywhere else that
+  // can't render markup. "Spin Finish — Technicolor Sky with Shelter
+  // Drake / 7-60 / Rush vs Dran Buster / 2-60 / Low Flat"
+  function battleSentenceText(e, match, lookup, buildsById, partsById) {
+    var aWon = e.winnerPlayerId === match.playerAId;
+    var winner = lookup(e.winnerPlayerId);
+    var winnerBuildId = aWon ? e.buildIdA : e.buildIdB;
+    var loserBuildId = aWon ? e.buildIdB : e.buildIdA;
+    return finishLabel(e.finishType) + " — " + winner.displayName + " with " + buildLabel(winnerBuildId, buildsById, partsById) +
+      " vs " + buildLabel(loserBuildId, buildsById, partsById);
+  }
+
   function battleSentenceHTML(e, match, lookup, buildsById, partsById) {
     var aWon = e.winnerPlayerId === match.playerAId;
     var winner = lookup(e.winnerPlayerId);
@@ -269,7 +297,7 @@
     var partsById = {}; data.parts.forEach(function (p) { partsById[p.partId] = p; });
 
     renderHeader(match, lookup);
-    renderSummary(match, lookup, timeline);
+    renderSummary(match, lookup, timeline, buildsById, partsById);
     renderBattleLog(timeline, match, lookup, buildsById, partsById);
     renderBuilds(decksAndBox, decksAndBox.box, match, buildsById, partsById);
     renderStats(decksAndBox.box, buildsById, partsById);
