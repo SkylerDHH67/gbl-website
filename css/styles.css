@@ -261,7 +261,7 @@ table.data-table td{ padding: 10px 12px; border-bottom: 1px solid var(--line-sof
 table.data-table tbody tr{ transition: background 0.15s ease; }
 table.data-table tbody tr:hover{ background: var(--bg-elevated); }
 table.data-table tbody tr:last-child td{ border-bottom:none; }
-td.num, th.num{ text-align:right; font-family: var(--data); }
+td.num, table.data-table th.num{ text-align:right; font-family: var(--data); }
 .rank-cell{ font-family: var(--data); color: var(--text-faint); }
 .rank-cell.top{ color: #251900; font-weight: 800; background: var(--gold); border-radius: 6px; padding: 2px 7px; display:inline-block; }
 .player-cell{ display:flex; align-items:center; gap:8px; font-weight:600; }
