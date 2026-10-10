@@ -278,6 +278,9 @@ td.num, th.num{ text-align:right; font-family: var(--data); }
 .matchup-faces{ display:flex; align-items:center; gap:7px; }
 .matchup-faces .player-logo{ width:24px; height:24px; min-width:24px; }
 
+.build-cell{ display:flex; align-items:center; gap:9px; }
+.blade-thumb{ width:30px; height:30px; min-width:30px; border-radius:6px; object-fit:cover; background: var(--bg-elevated); border:1px solid var(--line); flex-shrink:0; }
+
 /* ---------------------------------------------------------
    States: loading / error / empty
    --------------------------------------------------------- */

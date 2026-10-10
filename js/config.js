@@ -50,6 +50,7 @@ window.APP_CONFIG = {
     BATTLE_LOG: "feed_battle_log",
     RESHUFFLE_LOG: "feed_reshuffle_log",
     STANDINGS: "feed_standings",
+    BUILDS: "feed_builds",
     BUILD_STATS: "feed_build_stats",
     HEAD_TO_HEAD: "feed_head_to_head",
     DECK_RECORDS: "feed_deck_records",

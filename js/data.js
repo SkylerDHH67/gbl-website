@@ -33,6 +33,8 @@
     "deck_b_build_ids", "position_in_rotation", "insufficient_sample",
     "wordmark_logo_url", "target_score_override", "teammate_build_id",
     "finish_distribution", "points_per_battle", "debut_season_id",
+    "slot_1_part_id", "slot_1_role", "slot_2_part_id", "slot_2_role",
+    "slot_3_part_id", "slot_3_role", "nickname",
     "badge_logo_url", "points_against", "duration_battles", "deck_build_ids",
     "deck_net_rating", "winner_player_id", "player_a_id", "player_b_id",
     "build_id_a", "build_id_b", "score_a_after", "score_b_after",
@@ -230,6 +232,21 @@
     };
   }
 
+  // The Builds tab links a build_id to its three actual parts (and which
+  // slot/role each is - Blade/Ratchet/Bit) - this is what lets the site
+  // show "Shatter Horus / 1-60 / Hexa" instead of a bare build_id. Not
+  // filtered to active-only here: an older/inactive build's name should
+  // still resolve correctly in historical stats rather than disappearing.
+  function normalizeBuildRow(raw) {
+    return {
+      buildId: raw.build_id, playerId: raw.player_id, seasonId: raw.season_id,
+      slot1PartId: raw.slot_1_part_id || "", slot1Role: raw.slot_1_role || "",
+      slot2PartId: raw.slot_2_part_id || "", slot2Role: raw.slot_2_role || "",
+      slot3PartId: raw.slot_3_part_id || "", slot3Role: raw.slot_3_role || "",
+      nickname: raw.nickname || "", active: U.truthy(raw.active)
+    };
+  }
+
   function normalizeBuildStatsRow(raw) {
     var dist = {};
     (raw.finish_distribution || "").split(";").filter(Boolean).forEach(function (pair) {
@@ -294,15 +311,15 @@
     return Promise.all([
       fetchFeedSafe("PLAYERS"), fetchFeedSafe("PARTS_CATALOG"), fetchFeedSafe("CONFIG"),
       fetchFeedSafe("SCHEDULE"), fetchFeedSafe("UPCOMING"), fetchFeedSafe("MATCHES"), fetchFeedSafe("BATTLE_LOG"),
-      fetchFeedSafe("RESHUFFLE_LOG"), fetchFeedSafe("STANDINGS"), fetchFeedSafe("BUILD_STATS"),
+      fetchFeedSafe("RESHUFFLE_LOG"), fetchFeedSafe("STANDINGS"), fetchFeedSafe("BUILDS"), fetchFeedSafe("BUILD_STATS"),
       fetchFeedSafe("HEAD_TO_HEAD"), fetchFeedSafe("DECK_RECORDS"), fetchFeedSafe("BUILD_PAIR_SYNERGY"),
       fetchFeedSafe("STATS_LAB_SOURCE"), fetchFeedSafe("MEDIA")
     ]).then(function (results) {
       var r = {
         players: results[0], parts: results[1], config: results[2], schedule: results[3], upcoming: results[4], matches: results[5],
-        battleLog: results[6], reshuffleLog: results[7], standings: results[8], buildStats: results[9],
-        headToHead: results[10], deckRecords: results[11], buildPairSynergy: results[12],
-        statsLabSource: results[13], media: results[14]
+        battleLog: results[6], reshuffleLog: results[7], standings: results[8], builds: results[9], buildStats: results[10],
+        headToHead: results[11], deckRecords: results[12], buildPairSynergy: results[13],
+        statsLabSource: results[14], media: results[15]
       };
       var configMaps = buildConfigMaps(r.config.rows);
       return {
@@ -316,6 +333,7 @@
           battleLog: { ok: r.battleLog.ok, error: r.battleLog.error },
           reshuffleLog: { ok: r.reshuffleLog.ok, error: r.reshuffleLog.error },
           standings: { ok: r.standings.ok, error: r.standings.error },
+          builds: { ok: r.builds.ok, error: r.builds.error },
           buildStats: { ok: r.buildStats.ok, error: r.buildStats.error },
           headToHead: { ok: r.headToHead.ok, error: r.headToHead.error },
           deckRecords: { ok: r.deckRecords.ok, error: r.deckRecords.error },
@@ -333,6 +351,7 @@
         battleLog: r.battleLog.rows.filter(function (e) { return e.event_id; }).map(normalizeBattleRow),
         reshuffleLog: r.reshuffleLog.rows.filter(function (e) { return e.reshuffle_id; }).map(normalizeReshuffleRow),
         standings: r.standings.rows.filter(function (s) { return s.player_id; }).map(normalizeStandingsRow),
+        builds: r.builds.rows.filter(function (b) { return b.build_id; }).map(normalizeBuildRow),
         buildStats: r.buildStats.rows.filter(function (b) { return b.build_id; }).map(normalizeBuildStatsRow),
         headToHead: r.headToHead.rows.filter(function (h) { return h.playerX && h.playerY; }).map(normalizeHeadToHeadRow),
         deckRecords: r.deckRecords.rows.filter(function (d) { return d.player_id; }).map(normalizeDeckRecordRow),
