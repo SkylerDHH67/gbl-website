@@ -68,7 +68,7 @@
     if (!baseRows.length) { el.innerHTML = R.emptyBlock("No standings for this stage yet", "Standings appear once players have completed matches here."); return; }
     var rows = sortRows(baseRows, lookup);
     el.innerHTML = '<div class="table-wrap"><table class="data-table"><thead>' + renderHeaderRow() + '</thead><tbody>' + rows.map(function (r) {
-        return '<tr><td class="rank-cell' + (r.rank <= 3 ? " top" : "") + '">' + r.rank + '</td>' +
+        return '<tr><td class="rank-cell">' + (r.rank <= 3 ? '<span class="rank-badge">' + r.rank + '</span>' : r.rank) + '</td>' +
           '<td>' + R.playerCellWithLogoHTML(lookup(r.playerId)) + '</td>' +
           '<td class="num">' + r.matchesPlayed + '</td><td class="num">' + r.wins + '-' + r.losses + '</td><td class="num">' + U.pct(r.winPct) + '</td>' +
           '<td class="num">' + r.pointsFor + '</td><td class="num">' + r.pointsAgainst + '</td><td class="num">' + (r.pointDiff > 0 ? "+" : "") + r.pointDiff + '</td>' +

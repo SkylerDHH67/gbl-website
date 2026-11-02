@@ -56,7 +56,10 @@
     return '<span class="blade-thumb-placeholder"></span>';
   }
 
-  function enrichRow(r, partsById, buildsById, playerLookup) {
+  // matchHistory is only computed for the row currently expanded (see
+  // render()) - looping every build's full battle history on every
+  // render/sort would be wasted work for builds the admin never opens.
+  function enrichRow(r, partsById, buildsById, playerLookup, data, includeHistory) {
     var build = buildsById[r.buildId];
     var slot = bladeSlot(build);
     var bladePart = slot && partsById[slot.pid];
@@ -71,15 +74,81 @@
       winRate: r.winRate, pointsScored: r.pointsScored, pointsAgainst: r.pointsAgainst, netRating: r.netRating,
       pointsPerBattle: r.pointsPerBattle,
       finishDistribution: r.finishDistribution || {},
-      lossFinishDistribution: r.lossFinishDistribution || {}
+      lossFinishDistribution: r.lossFinishDistribution || {},
+      matchHistory: includeHistory ? buildMatchHistoryRows(r.buildId, data, partsById, buildsById, playerLookup) : []
     };
+  }
+
+  // Every statsLabSource row is one valid battle (one per side already
+  // distinguished by build_id_a/build_id_b), so a build's match history is
+  // just every row where it appears on either side, newest first. Matched
+  // against the Match Database purely for the date/link - the battle row
+  // itself already carries the opponent build, opponent player, finish,
+  // and points, so no extra lookups are needed for the core result.
+  var MATCH_HISTORY_SHOWN = 12;
+
+  function buildMatchHistoryRows(buildId, data, partsById, buildsById, playerLookup) {
+    var matchesById = {};
+    (data.matches || []).forEach(function (m) { matchesById[m.matchId] = m; });
+    var rows = [];
+    (data.statsLabSource || []).forEach(function (b) {
+      var isA = b.buildIdA === buildId, isB = !isA && b.buildIdB === buildId;
+      if (!isA && !isB) return;
+      var won = isA ? b.winnerPlayerId === b.playerAId : b.winnerPlayerId === b.playerBId;
+      var opponentBuildId = isA ? b.buildIdB : b.buildIdA;
+      var opponentPlayerId = isA ? b.playerBId : b.playerAId;
+      var m = matchesById[b.matchId];
+      rows.push({
+        matchId: b.matchId,
+        seq: b.seq,
+        won: won,
+        finishType: b.finishType,
+        pointsFor: won ? b.pointsAwarded : 0,
+        opponentBuildLabel: R.buildLabelOrFallback(buildsById[opponentBuildId], partsById, opponentBuildId),
+        opponentPlayerName: playerLookup(opponentPlayerId).displayName,
+        date: m ? m.date : null
+      });
+    });
+    rows.sort(function (a, b) {
+      var at = a.date ? new Date(a.date).getTime() : 0, bt = b.date ? new Date(b.date).getTime() : 0;
+      if (bt !== at) return bt - at;
+      return (b.seq || 0) - (a.seq || 0);
+    });
+    return rows;
+  }
+
+  function matchHistoryHTML(history) {
+    if (!history.length) {
+      return '<div class="eyebrow" style="margin:16px 0 8px;">Match History</div>' +
+        '<div style="color:var(--text-faint);font-size:0.85rem;">No logged battles for this build yet.</div>';
+    }
+    var shown = history.slice(0, MATCH_HISTORY_SHOWN);
+    var rows = shown.map(function (h) {
+      return '<a href="match.html?id=' + encodeURIComponent(h.matchId) + '" style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:7px 0;border-bottom:1px solid var(--line);font-size:0.85rem;color:inherit;text-decoration:none;">' +
+        '<span style="display:flex;align-items:center;gap:8px;min-width:0;flex:1;">' +
+        '<span style="font-weight:800;min-width:16px;color:' + (h.won ? "var(--xtreme)" : "var(--spin)") + ';">' + (h.won ? "W" : "L") + '</span>' +
+        '<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;">vs <strong style="font-family:var(--data);">' + U.esc(h.opponentBuildLabel) + '</strong> <span style="color:var(--text-faint);">— ' + U.esc(h.opponentPlayerName) + '</span></span>' +
+        '</span>' +
+        '<span style="color:var(--text-faint);flex-shrink:0;white-space:nowrap;font-size:0.8rem;">' +
+        (R.FINISH_LABELS[h.finishType] || h.finishType || "—") + (h.pointsFor ? " +" + h.pointsFor : "") +
+        (h.date ? " · " + U.fmtDateShort(h.date) : "") + '</span></a>';
+    }).join("");
+    var caption = history.length > MATCH_HISTORY_SHOWN
+      ? '<div style="color:var(--text-faint);font-size:0.78rem;margin-top:8px;">Showing ' + MATCH_HISTORY_SHOWN + ' most recent of ' + history.length + ' battles.</div>'
+      : "";
+    return '<div class="eyebrow" style="margin:16px 0 8px;">Match History</div>' + rows + caption;
   }
 
   function buildDetailHTML(e) {
     var topWin = R.topFinish(e.finishDistribution);
     var topLoss = R.topFinish(e.lossFinishDistribution);
+    // Title/eyebrow stays the site's default blue (.eyebrow's own color) -
+    // only the VALUE text is win/loss-coded, green for a win and red for a
+    // loss (same neon green as Xtreme Finish elsewhere), so the two
+    // callouts are tellable apart at a glance instead of both reading in
+    // the same blue.
     var callouts = '<div style="display:flex;gap:22px;flex-wrap:wrap;margin-bottom:14px;">' +
-      (topWin ? '<div><div class="eyebrow" style="margin-bottom:4px;">Most Common Win</div><div style="font-family:var(--data);font-weight:700;color:var(--arc-bright);">' + U.esc(topWin.label) + ' Finish <span style="color:var(--text-faint);font-weight:400;">(' + topWin.count + ')</span></div></div>' : "") +
+      (topWin ? '<div><div class="eyebrow" style="margin-bottom:4px;">Most Common Win</div><div style="font-family:var(--data);font-weight:700;color:var(--xtreme);">' + U.esc(topWin.label) + ' Finish <span style="color:var(--text-faint);font-weight:400;">(' + topWin.count + ')</span></div></div>' : "") +
       (topLoss ? '<div><div class="eyebrow" style="margin-bottom:4px;">Most Common Loss</div><div style="font-family:var(--data);font-weight:700;color:var(--spin);">' + U.esc(topLoss.label) + ' Finish <span style="color:var(--text-faint);font-weight:400;">(' + topLoss.count + ')</span></div></div>' : "") +
       '</div>';
     return '<div style="padding:14px 16px;">' +
@@ -95,7 +164,9 @@
       '<span><strong style="color:' + R.netRatingColor(e.netRating) + ';">' + e.netRating.toFixed(2) + '</strong> net rating</span>' +
       '<span><strong style="color:var(--text);">' + e.pointsPerBattle.toFixed(2) + '</strong> pts/battle</span>' +
       '<span><strong style="color:var(--text);">' + e.timesWon + '-' + e.timesLost + '</strong> battle record</span>' +
-      '</div></div>';
+      '</div>' +
+      matchHistoryHTML(e.matchHistory || []) +
+      '</div>';
   }
 
   function sortRows(rows) {
@@ -125,7 +196,9 @@
     var partsById = partsLookup(data.parts);
     var buildsById = buildsLookup(data.builds);
 
-    var enriched = ALL_ROWS.map(function (r) { return enrichRow(r, partsById, buildsById, playerLookup); });
+    var enriched = ALL_ROWS.map(function (r) {
+      return enrichRow(r, partsById, buildsById, playerLookup, data, r.buildId === expandedBuildId);
+    });
 
     var filtered = enriched.filter(function (e) {
       if (filterPlayerId && e.raw.playerId !== filterPlayerId) return false;

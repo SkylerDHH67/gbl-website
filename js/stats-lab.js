@@ -278,6 +278,65 @@
       }).join("") + '</tbody></table></div>';
   }
 
+  // "What does this build beat most, lose to most, and face most often" -
+  // answered league-wide from every statsLabSource battle the selected
+  // build appears in on either side, same scope convention as
+  // bladeBreakdownHTML (not limited to the season/stage/player filters
+  // above, since the question is inherently "across its whole history").
+  // Best/Toughest Matchup callouts apply the same small-sample guard used
+  // everywhere else on the site - a 1-0 record against some build never
+  // gets called its "best matchup" over a proven 8-2 one.
+  var MATCHUP_MIN_SAMPLE = 3;
+
+  function buildMatchupBreakdownHTML(data, partsById, buildsById) {
+    if (!filters.build) return "";
+    var buildId = filters.build;
+    var byOpponent = {};
+    (data.statsLabSource || []).forEach(function (b) {
+      var isA = b.buildIdA === buildId, isB = !isA && b.buildIdB === buildId;
+      if (!isA && !isB) return;
+      var oppId = isA ? b.buildIdB : b.buildIdA;
+      if (!oppId) return;
+      var won = isA ? b.winnerPlayerId === b.playerAId : b.winnerPlayerId === b.playerBId;
+      byOpponent[oppId] = byOpponent[oppId] || { faced: 0, won: 0 };
+      byOpponent[oppId].faced++;
+      if (won) byOpponent[oppId].won++;
+    });
+
+    var opponents = Object.keys(byOpponent).map(function (id) {
+      var s = byOpponent[id];
+      return {
+        label: R.buildLabelOrFallback(buildsById[id], partsById, id),
+        faced: s.faced, won: s.won, lost: s.faced - s.won,
+        winRate: s.faced ? s.won / s.faced : 0
+      };
+    });
+    if (!opponents.length) return "";
+
+    var buildLabel = R.buildLabelOrFallback(buildsById[buildId], partsById, buildId);
+    var qualified = opponents.filter(function (o) { return o.faced >= MATCHUP_MIN_SAMPLE; });
+    var best = qualified.slice().sort(function (a, b) { return b.winRate - a.winRate || b.faced - a.faced; })[0];
+    var worst = qualified.slice().sort(function (a, b) { return a.winRate - b.winRate || b.faced - a.faced; })[0];
+
+    var cards = [];
+    if (best) cards.push({ label: "Best Matchup", value: U.esc(best.label), sub: best.won + "-" + best.lost + " (" + U.pct(best.winRate) + ")" });
+    if (worst) cards.push({ label: "Toughest Matchup", value: U.esc(worst.label), sub: worst.won + "-" + worst.lost + " (" + U.pct(worst.winRate) + ")" });
+    var cardsHTML = cards.length
+      ? '<div class="grid grid-2" style="margin-bottom:18px;">' + cards.map(function (c) {
+          return '<div class="stat-card"><div class="label">' + U.esc(c.label) + '</div><div class="value" style="font-size:1.1rem;">' + c.value + '</div><div class="sub">' + U.esc(c.sub) + '</div></div>';
+        }).join("") + '</div>'
+      : (opponents.length ? '<p class="section-sub">No matchup has at least ' + MATCHUP_MIN_SAMPLE + ' battles yet, so Best/Toughest Matchup aren\'t called out below - the full breakdown still shows every opponent build faced so far.</p>' : "");
+
+    var sorted = opponents.slice().sort(function (a, b) { return b.faced - a.faced || b.winRate - a.winRate; });
+    return '<h2 class="section-title">Matchups for ' + U.esc(buildLabel) + '</h2>' + cardsHTML +
+      '<div class="table-wrap"><table class="data-table"><thead><tr><th>Opponent Build</th><th class="num">Faced</th><th class="num">Record</th><th class="num">Win Rate</th></tr></thead><tbody>' +
+      sorted.map(function (o) {
+        var low = o.faced < MATCHUP_MIN_SAMPLE ? '<span class="badge" title="Small sample size">n&lt;' + MATCHUP_MIN_SAMPLE + '</span> ' : "";
+        return '<tr><td>' + U.esc(o.label) + '</td><td class="num"><span class="num-cell">' + low + o.faced + '</span></td>' +
+          '<td class="num"><span class="num-cell">' + o.won + '-' + o.lost + '</span></td><td class="num"><span class="num-cell">' + U.pct(o.winRate) + '</span></td></tr>';
+      }).join("") + '</tbody></table></div>';
+  }
+
   function renderResults(data) {
     var partsById = partsLookup(data.parts);
     var buildsById = buildsLookup(data.builds);
@@ -286,7 +345,10 @@
       ? renderPlayerMode(data, partsById, buildsById, playerLookup)
       : renderLeagueMode(data, partsById, buildsById);
     var bladeHTML = bladeBreakdownHTML(data, partsById, buildsById);
-    document.getElementById("sl-results").innerHTML = mainHTML + (bladeHTML ? '<div style="margin-top:28px;">' + bladeHTML + '</div>' : "");
+    var matchupHTML = buildMatchupBreakdownHTML(data, partsById, buildsById);
+    document.getElementById("sl-results").innerHTML = mainHTML +
+      (matchupHTML ? '<div style="margin-top:28px;">' + matchupHTML + '</div>' : "") +
+      (bladeHTML ? '<div style="margin-top:28px;">' + bladeHTML + '</div>' : "");
   }
 
   window.APP_DATA.loadAppData().then(function (data) {

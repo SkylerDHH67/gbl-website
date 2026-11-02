@@ -105,7 +105,7 @@
     if (!rows.length) { el.innerHTML = R.emptyBlock("No standings yet", "Standings appear once players have completed matches in this stage."); return; }
     el.innerHTML = '<div class="table-wrap"><table class="data-table"><thead><tr><th>#</th><th>Player</th><th class="num">W-L</th><th class="num">Rating</th></tr></thead><tbody>' +
       rows.map(function (r) {
-        return '<tr><td class="rank-cell' + (r.rank <= 3 ? " top" : "") + '">' + r.rank + '</td><td><a href="player.html?id=' + encodeURIComponent(r.playerId) + '">' + U.esc(r.displayName) + '</a></td>' +
+        return '<tr><td class="rank-cell">' + (r.rank <= 3 ? '<span class="rank-badge">' + r.rank + '</span>' : r.rank) + '</td><td><a href="player.html?id=' + encodeURIComponent(r.playerId) + '">' + U.esc(r.displayName) + '</a></td>' +
           '<td class="num">' + r.wins + '-' + r.losses + '</td><td class="num">' + r.gblRating.toFixed(3) + '</td></tr>';
       }).join("") + "</tbody></table></div>";
   }
@@ -138,12 +138,25 @@
       '<span style="font-family:var(--data);font-size:0.68rem;letter-spacing:0.06em;text-transform:uppercase;color:var(--text-faint);">Build</span>' +
       '<span style="font-family:var(--data);font-size:0.68rem;letter-spacing:0.06em;text-transform:uppercase;color:var(--text-faint);">Rtg · Win% · Used</span>' +
       '</div>';
+    // Exactly two flex children per row (the rank+build group, and the
+    // score) - a THIRD top-level child here used to make space-between
+    // center the build text in the middle of the row instead of pinning
+    // it next to the rank number, which is what was reading as "funky"
+    // spacing. The rank+build group also truncates with an ellipsis
+    // (min-width:0 + overflow:hidden) instead of wrapping or squeezing
+    // the score column when a build/pilot name runs long.
     el.innerHTML = headerRow + top.map(function (r, i) {
       var pilot = lookup(r.playerId);
       var label = R.buildLabelOrFallback(buildsById[r.buildId], partsById, r.buildId);
-      return '<div class="result-row"><span class="rank-cell' + (i < 3 ? " top" : "") + '">' + (i + 1) + '.</span> ' +
-        '<span><span style="font-family:var(--data);font-weight:700;">' + U.esc(label) + '</span> <span style="color:var(--text-faint);font-size:0.82rem;">— ' + U.esc(pilot.displayName) + '</span></span>' +
-        '<span class="result-score">' + r.pointsPerBattle.toFixed(2) + ' <span style="color:var(--text-faint);font-weight:400;font-size:0.78rem;">rtg</span>' +
+      var rankHTML = i < 3 ? '<span class="rank-badge">' + (i + 1) + '</span>' : '<span class="rank-cell">' + (i + 1) + '.</span>';
+      return '<div class="result-row">' +
+        '<span style="display:flex;align-items:center;gap:8px;min-width:0;flex:1;">' + rankHTML +
+          '<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;">' +
+            '<span style="font-family:var(--data);font-weight:700;">' + U.esc(label) + '</span> ' +
+            '<span style="color:var(--text-faint);font-size:0.82rem;">— ' + U.esc(pilot.displayName) + '</span>' +
+          '</span>' +
+        '</span>' +
+        '<span class="result-score" style="flex-shrink:0;padding-left:10px;">' + r.pointsPerBattle.toFixed(2) + ' <span style="color:var(--text-faint);font-weight:400;font-size:0.78rem;">rtg</span>' +
         '<span style="color:var(--text-faint);font-weight:400;font-size:0.78rem;"> · ' + U.pct(r.winRate) + ' · ' + r.timesUsed + 'x</span></span></div>';
     }).join("");
   }

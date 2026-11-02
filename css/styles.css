@@ -293,7 +293,20 @@ table.data-table tbody tr:hover{ background: var(--bg-elevated); }
 table.data-table tbody tr:last-child td{ border-bottom:none; }
 td.num, table.data-table th.num{ text-align:right; font-family: var(--data); }
 .rank-cell{ font-family: var(--data); color: var(--text-faint); }
-.rank-cell.top{ color: #251900; font-weight: 800; background: var(--gold); border-radius: 6px; padding: 2px 7px; display:inline-block; }
+/* Rank badge (gold pill for top 3) lives on an INNER span, never on the
+   table cell itself. Putting display:inline-block + its own tight
+   padding directly on a <td> (the old approach) fights the table's own
+   `table.data-table td{padding:10px 12px}` via CSS specificity - the
+   pill's 2px 7px padding was winning out only for rows 1-3, so those
+   rows rendered with a visibly different cell box/alignment than every
+   other row in the same column. Keeping the <td> a plain table cell and
+   styling only the number inside it fixes that for good. */
+.rank-badge{
+  display:inline-flex; align-items:center; justify-content:center;
+  min-width: 20px; height: 20px; padding: 0 6px;
+  border-radius: 6px; font-weight: 800; color: #251900; background: var(--gold);
+  line-height: 1;
+}
 .player-cell{ display:flex; align-items:center; gap:8px; font-weight:600; }
 .player-cell .flag{ font-size: 1rem; }
 .player-avatar{ width:26px; height:26px; border-radius:50%; background: var(--bg-elevated); border:1px solid var(--line); object-fit: cover; }
