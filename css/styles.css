@@ -160,12 +160,25 @@ img{ max-width: 100%; display: block; }
 .score-ticker-wrap{
   background: var(--bg-elevated);
   border-bottom: 1px solid var(--line);
+  position: relative;
 }
+/* Edge fades hint that the row scrolls, the way NBA.com's ticker does,
+   without a visible scroll affordance sitting on top of the dark theme. */
+.score-ticker-wrap::before, .score-ticker-wrap::after{
+  content:""; position:absolute; top:0; bottom:0; width:28px; z-index:1; pointer-events:none;
+}
+.score-ticker-wrap::before{ left:0; background: linear-gradient(90deg, var(--bg-elevated), transparent); }
+.score-ticker-wrap::after{ right:0; background: linear-gradient(270deg, var(--bg-elevated), transparent); }
 .ticker-track{
   display:flex; gap:0; overflow-x:auto; -webkit-overflow-scrolling:touch;
   max-width: var(--maxw); margin: 0 auto; padding: 0 8px;
-  scrollbar-width: thin;
+  /* Scroll still works (touch drag, trackpad, shift+wheel) - only the
+     native scrollbar chrome is hidden, since an unstyled gray scrollbar
+     track was rendering as a stray bar across the page, nothing like the
+     clean NBA.com-style strip this is meant to look like. */
+  scrollbar-width: none; -ms-overflow-style: none;
 }
+.ticker-track::-webkit-scrollbar{ display:none; height:0; }
 .ticker-card{
   display:flex; flex-direction:column; align-items:center; justify-content:center;
   gap:4px; flex-shrink:0; min-width: 150px;
