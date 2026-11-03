@@ -19,7 +19,7 @@
       return {
         isManual: false, matchId: m.matchId, date: m.date, status: m.status,
         scoreA: m.finalScoreA, scoreB: m.finalScoreB,
-        playerAId: m.playerAId, playerBId: m.playerBId
+        playerAId: m.playerAId, playerBId: m.playerBId, winnerPlayerId: m.winnerPlayerId
       };
     });
     // Manual "Upcoming Matches" rows are hand-typed names with no
@@ -51,7 +51,16 @@
     }
 
     if (!all.length) { el.innerHTML = R.emptyBlock("No matches to show", playerFilterId ? "This player has no matches under the current filter." : "Try a different filter, or check back once matches are scheduled."); return; }
-    el.innerHTML = '<div class="table-wrap"><table class="data-table"><thead><tr><th>Date</th><th>Matchup</th><th class="num">Score</th><th>Status</th></tr></thead><tbody>' +
+
+    // Result column (green W / red L, from the filtered player's own
+    // perspective) only appears once a player filter is actually applied -
+    // "who won" isn't a meaningful column against the unfiltered field of
+    // every player's matches, and showing it only here keeps it from being
+    // confused with the neutral win/loss status badge (statusBadge, which
+    // is gold-toned for a different purpose) used elsewhere on the site.
+    var showResult = !!playerFilterId;
+
+    el.innerHTML = '<div class="table-wrap"><table class="data-table"><thead><tr><th>Date</th><th>Matchup</th><th class="num">Score</th><th>Status</th>' + (showResult ? "<th>Result</th>" : "") + '</tr></thead><tbody>' +
       all.map(function (r) {
         var matchup, score = (r.scoreA === null || r.scoreA === undefined) ? "—" : (r.scoreA + "–" + r.scoreB);
         if (r.isManual) {
@@ -65,7 +74,16 @@
           var plain = U.esc(a.displayName) + ' <span style="color:var(--text-faint)">vs</span> ' + U.esc(b.displayName);
           matchup = r.status === "COMPLETE" ? '<a href="match.html?id=' + encodeURIComponent(r.matchId) + '">' + plain + "</a>" : plain;
         }
-        return "<tr><td>" + (r.isManual ? U.esc(r.date || "TBD") : U.fmtDate(r.date)) + "</td><td>" + matchup + '</td><td class="num">' + score + "</td><td>" + R.statusBadge(r.status) + "</td></tr>";
+        var resultCell = "";
+        if (showResult) {
+          if (!r.isManual && r.status === "COMPLETE" && r.winnerPlayerId) {
+            var won = r.winnerPlayerId === playerFilterId;
+            resultCell = '<td><span class="badge" style="color:' + (won ? "var(--xtreme)" : "var(--spin)") + ';border-color:' + (won ? "var(--xtreme)" : "var(--spin)") + ';background:' + (won ? "rgba(57,255,106,0.1)" : "rgba(239,62,74,0.08)") + ';">' + (won ? "W" : "L") + "</span></td>";
+          } else {
+            resultCell = '<td><span style="color:var(--text-faint);">—</span></td>';
+          }
+        }
+        return "<tr><td>" + (r.isManual ? U.esc(r.date || "TBD") : U.fmtDate(r.date)) + "</td><td>" + matchup + '</td><td class="num">' + score + "</td><td>" + R.statusBadge(r.status) + "</td>" + resultCell + "</tr>";
       }).join("") + "</tbody></table></div>";
   }
 

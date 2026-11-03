@@ -151,6 +151,41 @@ img{ max-width: 100%; display: block; }
 .header-meta-strip strong{ color: var(--gold-bright); font-weight: 600; }
 .header-meta-strip .dot-sep{ opacity: 0.5; margin: 0 2px; }
 @media (max-width: 640px){ .header-meta-strip{ text-align: left; font-size: 0.68rem; } }
+
+/* Score ticker - NBA.com-style recent-results strip, injected by ticker.js
+   right after the header on every page. Not sticky (scrolls away with the
+   page) so it never competes with the sticky nav bar above it. Horizontal
+   scroll is the whole interaction model, including on mobile where it's
+   just a native touch-scroll row - no extra JS needed for that. */
+.score-ticker-wrap{
+  background: var(--bg-elevated);
+  border-bottom: 1px solid var(--line);
+}
+.ticker-track{
+  display:flex; gap:0; overflow-x:auto; -webkit-overflow-scrolling:touch;
+  max-width: var(--maxw); margin: 0 auto; padding: 0 8px;
+  scrollbar-width: thin;
+}
+.ticker-card{
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  gap:4px; flex-shrink:0; min-width: 150px;
+  padding: 10px 16px; text-decoration:none; color: inherit;
+  border-right: 1px solid var(--line-soft);
+}
+.ticker-card:hover{ background: var(--bg-elevated-hover, rgba(255,255,255,0.03)); }
+.ticker-matchup{ display:flex; align-items:center; gap:7px; }
+.ticker-score{ font-family: var(--data); font-size: 1.05rem; font-weight:700; color: var(--text-faint); min-width: 16px; text-align:center; }
+.ticker-score.win{ color: var(--text); }
+.ticker-dash{ color: var(--text-faint); font-size:0.8rem; }
+.ticker-names{ font-size:0.7rem; color: var(--text-dim); white-space:nowrap; max-width: 150px; overflow:hidden; text-overflow:ellipsis; }
+.ticker-vs{ color: var(--text-faint); }
+.ticker-meta{ display:flex; align-items:center; gap:6px; font-family: var(--data); font-size:0.66rem; color: var(--text-faint); letter-spacing:0.02em; }
+.ticker-blades{ display:flex; gap:2px; }
+.ticker-blade{ width:14px; height:14px; border-radius:3px; object-fit:cover; background: var(--bg); border:1px solid var(--line); }
+@media (max-width: 640px){
+  .ticker-card{ min-width: 126px; padding: 8px 12px; }
+  .ticker-names{ max-width: 126px; }
+}
 .brand{ display:flex; align-items:center; gap:10px; font-family: var(--display); font-weight:700; font-size: 1.2rem; letter-spacing: 0.01em; }
 .brand-mark{
   width: 38px; height: 38px; border-radius: 50%;

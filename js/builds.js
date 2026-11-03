@@ -21,7 +21,9 @@
     { key: "pointsScored", label: "Pts For", num: true, sortable: true },
     { key: "pointsAgainst", label: "Pts Against", num: true, sortable: true },
     { key: "netRating", label: "Net Rating", num: true, sortable: true },
-    { key: "pointsPerBattle", label: "Pts/Battle", num: true, sortable: true }
+    { key: "pointsPerBattle", label: "Pts/Battle", num: true, sortable: true },
+    { key: "form", label: "Form", sortable: false },
+    { key: "streak", label: "Streak", sortable: false }
   ];
 
 
@@ -56,13 +58,51 @@
     return '<span class="blade-thumb-placeholder"></span>';
   }
 
+  // One pass over the whole statsLabSource feed builds every build's
+  // chronological W/L sequence at once (keyed off the Match Database's
+  // date, falling back to the shared seq counter when two battles land on
+  // the same date) - far cheaper than re-scanning all battles once per
+  // build row, which is what buildMatchHistoryRows does for the one
+  // expanded row. Feeds both the Form (trend arrow) and Streak columns.
+  function buildFormMaps_(data) {
+    var matchesById = {};
+    (data.matches || []).forEach(function (m) { matchesById[m.matchId] = m; });
+    var map = {};
+    (data.statsLabSource || []).forEach(function (b) {
+      var m = matchesById[b.matchId];
+      var date = m ? m.date : null;
+      if (b.buildIdA) (map[b.buildIdA] = map[b.buildIdA] || []).push({ date: date, seq: b.seq, won: b.winnerPlayerId === b.playerAId });
+      if (b.buildIdB) (map[b.buildIdB] = map[b.buildIdB] || []).push({ date: date, seq: b.seq, won: b.winnerPlayerId === b.playerBId });
+    });
+    Object.keys(map).forEach(function (id) {
+      map[id].sort(function (x, y) {
+        var xt = x.date ? new Date(x.date).getTime() : 0, yt = y.date ? new Date(y.date).getTime() : 0;
+        if (xt !== yt) return xt - yt;
+        return (x.seq || 0) - (y.seq || 0);
+      });
+    });
+    return map;
+  }
+
+  // "3W" / "2L" - the build's current run as of its most recent recorded
+  // battle. Empty string (not "0") when there's no history yet.
+  function streakLabel_(wlSequence) {
+    if (!wlSequence.length) return "";
+    var last = wlSequence[wlSequence.length - 1];
+    var count = 0;
+    for (var i = wlSequence.length - 1; i >= 0 && wlSequence[i] === last; i--) count++;
+    return count + last;
+  }
+
   // matchHistory is only computed for the row currently expanded (see
   // render()) - looping every build's full battle history on every
   // render/sort would be wasted work for builds the admin never opens.
-  function enrichRow(r, partsById, buildsById, playerLookup, data, includeHistory) {
+  function enrichRow(r, partsById, buildsById, playerLookup, data, includeHistory, formMaps) {
     var build = buildsById[r.buildId];
     var slot = bladeSlot(build);
     var bladePart = slot && partsById[slot.pid];
+    var sequence = (formMaps && formMaps[r.buildId]) || [];
+    var wl = sequence.map(function (s) { return s.won ? "W" : "L"; }).join("");
     return {
       raw: r,
       build: build,
@@ -75,6 +115,8 @@
       pointsPerBattle: r.pointsPerBattle,
       finishDistribution: r.finishDistribution || {},
       lossFinishDistribution: r.lossFinishDistribution || {},
+      last10: wl.slice(-10),
+      streak: streakLabel_(wl),
       matchHistory: includeHistory ? buildMatchHistoryRows(r.buildId, data, partsById, buildsById, playerLookup) : []
     };
   }
@@ -196,8 +238,9 @@
     var partsById = partsLookup(data.parts);
     var buildsById = buildsLookup(data.builds);
 
+    var formMaps = buildFormMaps_(data);
     var enriched = ALL_ROWS.map(function (r) {
-      return enrichRow(r, partsById, buildsById, playerLookup, data, r.buildId === expandedBuildId);
+      return enrichRow(r, partsById, buildsById, playerLookup, data, r.buildId === expandedBuildId, formMaps);
     });
 
     var filtered = enriched.filter(function (e) {
@@ -236,7 +279,9 @@
           '<td class="num"><span class="num-cell">' + e.pointsScored + '</span></td>' +
           '<td class="num"><span class="num-cell">' + e.pointsAgainst + '</span></td>' +
           '<td class="num"><span class="num-cell" style="color:' + R.netRatingColor(e.netRating) + ';font-weight:700;">' + e.netRating.toFixed(2) + '</span></td>' +
-          '<td class="num"><span class="num-cell">' + e.pointsPerBattle.toFixed(2) + '</span></td></tr>';
+          '<td class="num"><span class="num-cell">' + e.pointsPerBattle.toFixed(2) + '</span></td>' +
+          '<td style="text-align:center;">' + R.trendBadgeHTML(e.last10) + '</td>' +
+          '<td style="font-family:var(--data);color:' + (e.streak.indexOf("W") !== -1 ? "var(--xtreme)" : e.streak.indexOf("L") !== -1 ? "var(--spin)" : "var(--text-faint)") + ';">' + U.esc(e.streak || "—") + '</td></tr>';
         if (isOpen) {
           rowHTML += '<tr class="build-detail-row"><td colspan="' + colCount + '" style="padding:0;background:var(--bg-elevated);">' + buildDetailHTML(e) + '</td></tr>';
         }

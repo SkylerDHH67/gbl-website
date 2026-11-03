@@ -197,7 +197,12 @@
       matchId: raw.match_id, seasonId: raw.season_id, stageId: raw.stage_id,
       playerAId: raw.player_a_id, playerBId: raw.player_b_id, date: raw.date,
       targetScore: U.num(raw.target_score), finalScoreA: U.num(raw.final_score_a), finalScoreB: U.num(raw.final_score_b),
-      winnerPlayerId: raw.winner_player_id, status: raw.status || "", durationBattles: U.num(raw.duration_battles)
+      winnerPlayerId: raw.winner_player_id, status: raw.status || "", durationBattles: U.num(raw.duration_battles),
+      // Phase 8 columns - absent on any match recorded before that migration,
+      // so always optional (comma-separated build_ids, split on use). Lets
+      // the score ticker show the winning deck's blade thumbnails without
+      // re-deriving a deck from the battle log.
+      deckABuildIds: raw.deck_a_build_ids || "", deckBBuildIds: raw.deck_b_build_ids || ""
     };
   }
 
@@ -322,7 +327,22 @@
     };
   }
 
+  // Memoized so every script on a page (e.g. the page's main script plus
+  // ticker.js running alongside it) shares one set of feed fetches instead
+  // of each independently re-fetching all 16 feeds. Cleared on failure so a
+  // transient network error doesn't permanently wedge the page into always
+  // rejecting - the next call just re-fetches.
+  var _appDataPromise = null;
   function loadAppData() {
+    if (_appDataPromise) return _appDataPromise;
+    _appDataPromise = loadAppDataFresh_().catch(function (err) {
+      _appDataPromise = null;
+      throw err;
+    });
+    return _appDataPromise;
+  }
+
+  function loadAppDataFresh_() {
     return Promise.all([
       fetchFeedSafe("PLAYERS"), fetchFeedSafe("PARTS_CATALOG"), fetchFeedSafe("CONFIG"),
       fetchFeedSafe("SCHEDULE"), fetchFeedSafe("UPCOMING"), fetchFeedSafe("MATCHES"), fetchFeedSafe("BATTLE_LOG"),

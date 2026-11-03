@@ -235,19 +235,33 @@
         if (s.won) byBuild[s.id].won++;
       });
     });
-    var buildList = Object.keys(byBuild).map(function (id) {
-      var s = byBuild[id];
-      return { label: R.buildLabelOrFallback(buildsById[id], partsById, id), used: s.used, won: s.won, winRate: s.used ? s.won / s.used : 0 };
-    }).sort(function (a, b) { return b.used - a.used; }).slice(0, 15);
+
+    // Skipped once a single build is already pinned via the filter - a table
+    // that lists that build mixed in with every opponent it faced (all under
+    // one undifferentiated "Top builds" list) is exactly what was confusing
+    // to read. The dedicated Matchups section below (buildMatchupBreakdownHTML)
+    // already answers "what does it face/beat/lose to" with opponents clearly
+    // labeled as opponents - this table only adds value when NO single build
+    // is pinned (i.e. it's actually surveying the whole filtered field).
+    var buildTableHTML = "";
+    if (!filters.build) {
+      var buildList = Object.keys(byBuild).map(function (id) {
+        var s = byBuild[id];
+        return { label: R.buildLabelOrFallback(buildsById[id], partsById, id), used: s.used, won: s.won, winRate: s.used ? s.won / s.used : 0 };
+      }).sort(function (a, b) { return b.used - a.used; }).slice(0, 15);
+
+      buildTableHTML = '<h2 class="section-title">Top builds in this filter</h2><div class="table-wrap"><table class="data-table"><thead><tr><th>Build</th><th class="num">Used</th><th class="num">Won</th><th class="num">Win Rate</th></tr></thead><tbody>' +
+        buildList.map(function (b) {
+          var low = b.used < LOW_SAMPLE_THRESHOLD ? '<span class="badge" title="Small sample size">n&lt;' + LOW_SAMPLE_THRESHOLD + '</span> ' : "";
+          return '<tr><td>' + U.esc(b.label) + '</td><td class="num"><span class="num-cell">' + low + b.used + '</span></td><td class="num"><span class="num-cell">' + b.won + '</span></td><td class="num"><span class="num-cell">' + U.pct(b.winRate) + '</span></td></tr>';
+        }).join("") + '</tbody></table></div>';
+    }
 
     return '<h2 class="section-title">League-wide</h2>' +
       statCardsHTML([{ label: "Battles", value: battlesRows.length }, { label: "Distinct Builds Seen", value: Object.keys(byBuild).length }]) +
       '<div class="panel" style="margin-bottom:18px;"><div class="eyebrow">Finish Breakdown</div>' + R.finishBarHTML(dist) + '</div>' +
-      '<h2 class="section-title">Top builds in this filter</h2><div class="table-wrap"><table class="data-table"><thead><tr><th>Build</th><th class="num">Used</th><th class="num">Won</th><th class="num">Win Rate</th></tr></thead><tbody>' +
-      buildList.map(function (b) {
-        var low = b.used < LOW_SAMPLE_THRESHOLD ? '<span class="badge" title="Small sample size">n&lt;' + LOW_SAMPLE_THRESHOLD + '</span> ' : "";
-        return '<tr><td>' + U.esc(b.label) + '</td><td class="num"><span class="num-cell">' + low + b.used + '</span></td><td class="num"><span class="num-cell">' + b.won + '</span></td><td class="num"><span class="num-cell">' + U.pct(b.winRate) + '</span></td></tr>';
-      }).join("") + '</tbody></table></div><p class="section-sub" style="margin-top:14px;">Select a player above to see individual results, head-to-head, and per-battle detail.</p>';
+      buildTableHTML +
+      '<p class="section-sub" style="margin-top:14px;">Select a player above to see individual results, head-to-head, and per-battle detail.</p>';
   }
 
   // "Which Ratchet/Bit combo does this Blade perform best with" - answered

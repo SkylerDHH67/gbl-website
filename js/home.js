@@ -103,10 +103,10 @@
     if (!data.meta.standings.ok) { el.innerHTML = R.errorBlock(data.meta.standings.error, "feed_standings"); return; }
     var rows = data.standings.filter(function (s) { return s.stageId === currentStageId; }).sort(function (a, b) { return a.rank - b.rank; }).slice(0, 5);
     if (!rows.length) { el.innerHTML = R.emptyBlock("No standings yet", "Standings appear once players have completed matches in this stage."); return; }
-    el.innerHTML = '<div class="table-wrap"><table class="data-table"><thead><tr><th>#</th><th>Player</th><th class="num">W-L</th><th class="num">Rating</th></tr></thead><tbody>' +
+    el.innerHTML = '<div class="table-wrap"><table class="data-table"><thead><tr><th>#</th><th>Player</th><th class="num">W-L</th><th style="text-align:center;">Trend</th><th class="num">Rating</th></tr></thead><tbody>' +
       rows.map(function (r) {
         return '<tr><td class="rank-cell">' + (r.rank <= 3 ? '<span class="rank-badge">' + r.rank + '</span>' : r.rank) + '</td><td><a href="player.html?id=' + encodeURIComponent(r.playerId) + '">' + U.esc(r.displayName) + '</a></td>' +
-          '<td class="num">' + r.wins + '-' + r.losses + '</td><td class="num">' + r.gblRating.toFixed(3) + '</td></tr>';
+          '<td class="num">' + r.wins + '-' + r.losses + '</td><td style="text-align:center;">' + R.trendBadgeHTML(r.last10) + '</td><td class="num">' + r.gblRating.toFixed(3) + '</td></tr>';
       }).join("") + "</tbody></table></div>";
   }
 

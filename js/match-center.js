@@ -248,7 +248,22 @@
       '</div>';
   }
 
-  function renderSummary(match, lookup, timeline, buildsById, partsById) {
+  // "Top Performer" per side - whichever build scored the most points for
+  // that player in THIS match, straight from the same box-score tally the
+  // Builds/Stats tabs already compute (no separate pass over the timeline).
+  // Only called out if it actually won at least one battle, so a build that
+  // was tried once and lost doesn't get framed as a "top" anything.
+  function topPerformerFor(side, box) {
+    var best = null;
+    Object.keys(box).forEach(function (buildId) {
+      var b = box[buildId];
+      if (b.side !== side || b.wins === 0) return;
+      if (!best || b.pointsWon > best.pointsWon) best = b;
+    });
+    return best;
+  }
+
+  function renderSummary(match, lookup, timeline, buildsById, partsById, box) {
     var a = lookup(match.playerAId), b = lookup(match.playerBId);
     var realBattles = timeline.filter(function (e) { return e.kind === "battle" && !e.isRedo; });
     var reshuffleCount = timeline.filter(function (e) { return e.kind === "reshuffle"; }).length;
@@ -257,10 +272,43 @@
     if (match.status === "COMPLETE") {
       var winner = match.winnerPlayerId === match.playerAId ? a : b;
       html += '<p style="font-size:1.05rem;">' + U.esc(winner.displayName) + ' won ' + match.finalScoreA + '–' + match.finalScoreB + ' over ' + realBattles.length + ' battle' + (realBattles.length === 1 ? "" : "s") + (reshuffleCount ? " across " + (reshuffleCount + 1) + " rotations" : "") + '.</p>';
+
+      // "Decided by" - the clinching battle is simply the last real battle
+      // recorded, since the match stops the instant either side reaches the
+      // target score (the engine never logs a battle after that point).
+      if (realBattles.length) {
+        var clincher = realBattles[realBattles.length - 1];
+        var aWonClinch = clincher.winnerPlayerId === match.playerAId;
+        var clinchWinner = aWonClinch ? a : b;
+        var clinchBuildId = aWonClinch ? clincher.buildIdA : clincher.buildIdB;
+        html += '<p style="color:var(--text-dim);font-size:0.9rem;margin-top:-6px;">Decided by a <strong style="color:var(--text);">' + U.esc(finishLabel(clincher.finishType)) + '</strong> finish — ' +
+          U.esc(clinchWinner.displayName) + ' with ' + U.esc(buildLabel(clinchBuildId, buildsById, partsById)) + '.</p>';
+      }
     } else {
       html += '<p style="font-size:1.05rem;">Match in progress — ' + match.finalScoreA + '–' + match.finalScoreB + '.</p>';
     }
     if (redoCount) html += '<p style="color:var(--text-faint);font-size:0.85rem;">' + redoCount + ' redo' + (redoCount === 1 ? "" : "s") + ' occurred during this match (Air Contact / No Contact) — these don\'t affect score and are shown in the Battle Log tab.</p>';
+
+    // Finish-type breakdown across the whole match (every real battle, win
+    // or loss doesn't matter here - just "how did points get scored").
+    if (realBattles.length) {
+      var matchFinishDist = {};
+      realBattles.forEach(function (e) { if (e.finishType) matchFinishDist[e.finishType] = (matchFinishDist[e.finishType] || 0) + 1; });
+      html += '<div style="margin-top:14px;"><div class="eyebrow" style="margin-bottom:8px;">Finish Breakdown</div>' + R.finishBarHTML(matchFinishDist) + '</div>';
+    }
+
+    // Top Performer per side - only shown once box-score data exists for
+    // that side (always true for a completed match with at least 1 battle).
+    if (box) {
+      var topA = topPerformerFor("A", box), topB = topPerformerFor("B", box);
+      if (topA || topB) {
+        html += '<div style="display:flex;gap:22px;flex-wrap:wrap;margin-top:14px;">' +
+          (topA ? '<div><div class="eyebrow" style="margin-bottom:4px;">Top Performer — ' + U.esc(a.displayName) + '</div><div style="font-family:var(--data);font-weight:700;">' + U.esc(buildLabel(topA.buildId, buildsById, partsById)) + ' <span style="color:var(--text-faint);font-weight:400;">(' + topA.pointsWon + ' pts, ' + topA.wins + '-' + topA.losses + ')</span></div></div>' : "") +
+          (topB ? '<div><div class="eyebrow" style="margin-bottom:4px;">Top Performer — ' + U.esc(b.displayName) + '</div><div style="font-family:var(--data);font-weight:700;">' + U.esc(buildLabel(topB.buildId, buildsById, partsById)) + ' <span style="color:var(--text-faint);font-weight:400;">(' + topB.pointsWon + ' pts, ' + topB.wins + '-' + topB.losses + ')</span></div></div>' : "") +
+          '</div>';
+      }
+    }
+
     if (realBattles.length) html += scoreLineSVG(realBattles, match, lookup, buildsById, partsById);
     html += '</div>';
     var summaryEl = document.getElementById("mc-summary");
@@ -399,7 +447,7 @@
     var partsById = {}; data.parts.forEach(function (p) { partsById[p.partId] = p; });
 
     renderHeader(match, lookup);
-    renderSummary(match, lookup, timeline, buildsById, partsById);
+    renderSummary(match, lookup, timeline, buildsById, partsById, decksAndBox.box);
     renderBattleLog(timeline, match, lookup, buildsById, partsById);
     renderBuilds(decksAndBox, decksAndBox.box, match, buildsById, partsById);
     renderStats(decksAndBox.box, buildsById, partsById);

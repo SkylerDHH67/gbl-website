@@ -248,6 +248,39 @@
     return fullBuildLabel(build, partsById) || "Unlisted Build";
   }
 
+  // Standings' last10 string is built chronologically oldest-to-newest
+  // (RatingEngine.gs: `results.slice(-10).join("")`), so splitting it in
+  // half and comparing the older half's win rate to the more recent half's
+  // is a real trend read, not just a random split. Requires at least 4
+  // results before calling a trend at all - same small-sample guard used
+  // everywhere else on the site, since a 1-1 record split into two single
+  // games would otherwise read as a dramatic swing.
+  var TREND_MIN_RESULTS = 4;
+  var TREND_SWING_THRESHOLD = 0.2; // >=20pt win-rate swing between halves to call up/down rather than flat
+
+  function trendInfo(last10) {
+    var s = String(last10 || "").replace(/[^WL]/gi, "").toUpperCase();
+    if (s.length < TREND_MIN_RESULTS) return null;
+    var mid = Math.floor(s.length / 2);
+    var older = s.slice(0, mid), recent = s.slice(mid);
+    function winPct(str) {
+      if (!str.length) return 0;
+      var w = 0;
+      for (var i = 0; i < str.length; i++) if (str[i] === "W") w++;
+      return w / str.length;
+    }
+    var diff = winPct(recent) - winPct(older);
+    if (diff >= TREND_SWING_THRESHOLD) return { dir: "up", color: "var(--xtreme)", arrow: "▲", label: "Trending up" };
+    if (diff <= -TREND_SWING_THRESHOLD) return { dir: "down", color: "var(--spin)", arrow: "▼", label: "Trending down" };
+    return { dir: "flat", color: "var(--gold)", arrow: "▬", label: "Steady" };
+  }
+
+  function trendBadgeHTML(last10) {
+    var t = trendInfo(last10);
+    if (!t) return '<span style="color:var(--text-faint);">—</span>';
+    return '<span style="color:' + t.color + ';font-weight:800;" title="' + U.esc(t.label) + '">' + t.arrow + '</span>';
+  }
+
   window.APP_RENDER = {
     loadingBlock: loadingBlock, errorBlock: errorBlock, emptyBlock: emptyBlock,
     playerLookup: playerLookup, playerLookupByName: playerLookupByName,
@@ -257,6 +290,6 @@
     FINISH_LABELS: FINISH_LABELS, FINISH_COLORS: FINISH_COLORS, FINISH_ORDER: FINISH_ORDER,
     finishBarHTML: finishBarHTML, topFinish: topFinish, netRatingColor: netRatingColor, bladeSlotOf: bladeSlotOf, fullBuildLabel: fullBuildLabel,
     formatRatchetName: formatRatchetName, buildLabelOrFallback: buildLabelOrFallback,
-    pickCurrentStageId: pickCurrentStageId
+    pickCurrentStageId: pickCurrentStageId, trendInfo: trendInfo, trendBadgeHTML: trendBadgeHTML
   };
 })();
