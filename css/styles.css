@@ -165,13 +165,13 @@ img{ max-width: 100%; display: block; }
 /* Edge fades hint that the row scrolls, the way NBA.com's ticker does,
    without a visible scroll affordance sitting on top of the dark theme. */
 .score-ticker-wrap::before, .score-ticker-wrap::after{
-  content:""; position:absolute; top:0; bottom:0; width:28px; z-index:1; pointer-events:none;
+  content:""; position:absolute; top:0; bottom:0; width:40px; z-index:1; pointer-events:none;
 }
 .score-ticker-wrap::before{ left:0; background: linear-gradient(90deg, var(--bg-elevated), transparent); }
 .score-ticker-wrap::after{ right:0; background: linear-gradient(270deg, var(--bg-elevated), transparent); }
 .ticker-track{
   display:flex; gap:0; overflow-x:auto; -webkit-overflow-scrolling:touch;
-  max-width: var(--maxw); margin: 0 auto; padding: 0 8px;
+  max-width: var(--maxw); margin: 0 auto; padding: 0 34px;
   /* Scroll still works (touch drag, trackpad, shift+wheel) - only the
      native scrollbar chrome is hidden, since an unstyled gray scrollbar
      track was rendering as a stray bar across the page, nothing like the
@@ -179,6 +179,18 @@ img{ max-width: 100%; display: block; }
   scrollbar-width: none; -ms-overflow-style: none;
 }
 .ticker-track::-webkit-scrollbar{ display:none; height:0; }
+/* Click targets that just nudge the scroll container - purely a visual
+   signal that this row is scrollable, the way a carousel's arrows are,
+   layered above the edge fades so they stay legible over any card. */
+.ticker-arrow{
+  position:absolute; top:0; bottom:0; z-index:2; width:28px;
+  display:flex; align-items:center; justify-content:center;
+  background:none; border:none; color: var(--text-dim); font-size:1.3rem; font-family: var(--sans);
+  cursor:pointer; padding:0;
+}
+.ticker-arrow:hover{ color: var(--text); }
+.ticker-arrow-left{ left:0; justify-content:flex-start; padding-left:4px; }
+.ticker-arrow-right{ right:0; justify-content:flex-end; padding-right:4px; }
 .ticker-card{
   display:flex; flex-direction:column; align-items:center; justify-content:center;
   gap:4px; flex-shrink:0; min-width: 150px;
@@ -193,8 +205,6 @@ img{ max-width: 100%; display: block; }
 .ticker-names{ font-size:0.7rem; color: var(--text-dim); white-space:nowrap; max-width: 150px; overflow:hidden; text-overflow:ellipsis; }
 .ticker-vs{ color: var(--text-faint); }
 .ticker-meta{ display:flex; align-items:center; gap:6px; font-family: var(--data); font-size:0.66rem; color: var(--text-faint); letter-spacing:0.02em; }
-.ticker-blades{ display:flex; gap:2px; }
-.ticker-blade{ width:14px; height:14px; border-radius:3px; object-fit:cover; background: var(--bg); border:1px solid var(--line); }
 @media (max-width: 640px){
   .ticker-card{ min-width: 126px; padding: 8px 12px; }
   .ticker-names{ max-width: 126px; }
@@ -499,6 +509,17 @@ select, input[type="text"], input[type="search"]{
 .result-row:last-child{ border-bottom:none; }
 a.result-row:hover{ padding-left: 4px; }
 .result-score{ font-family: var(--data); font-weight:700; }
+
+/* Home module text balance: Recent Results/Upcoming Matches read a touch
+   large next to Top Builds/Standings Snapshot's denser monospace numbers
+   at the shared default sizes above, so each pair gets a small nudge in
+   the opposite direction here - scoped to the home page's own container
+   ids rather than changing .result-row/.data-table globally, since both
+   classes are shared with Match Center and the full Standings/Builds
+   pages where the current sizing is already right. */
+#home-results .result-row, #home-upcoming .result-row{ font-size: 0.84rem; }
+#home-leaders .result-row{ font-size: 0.98rem; }
+#home-standings table.data-table{ font-size: 0.98rem; }
 
 /* ---------------------------------------------------------
    Match Center

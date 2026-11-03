@@ -73,10 +73,7 @@ window.APP_CONFIG = {
   // Most recent N results/matches to show on the home page.
   HOME_RESULTS_COUNT: 5,
   HOME_SCHEDULE_COUNT: 5,
-  HOME_LEADERS_COUNT: 5,
-
-  // How many recent completed matches the site-wide score ticker shows.
-  TICKER_COUNT: 10
+  HOME_LEADERS_COUNT: 5
 };
 
 // Builds the public CSV export URL for a Display Sheet tab by name. Works

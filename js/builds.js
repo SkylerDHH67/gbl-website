@@ -22,9 +22,16 @@
     { key: "pointsAgainst", label: "Pts Against", num: true, sortable: true },
     { key: "netRating", label: "Net Rating", num: true, sortable: true },
     { key: "pointsPerBattle", label: "Pts/Battle", num: true, sortable: true },
-    { key: "form", label: "Form", sortable: false },
-    { key: "streak", label: "Streak", sortable: false }
+    { key: "form", label: "Trend", sortable: false },
+    { key: "streak", label: "Streak", sortable: false },
+    { key: "volatility", label: "Volatility Rating", num: true, sortable: true }
   ];
+
+  // A build needs at least this many recorded uses before Volatility Rating
+  // is shown at all - standard deviation of a 2-battle sample is noise, not
+  // a real read on how predictable a build is. Reuses the same threshold
+  // the "small sample" badge elsewhere on this page already uses.
+  var VOLATILITY_MIN_SAMPLE = LOW_SAMPLE_THRESHOLD;
 
 
   function partsLookup(parts) {
@@ -59,11 +66,12 @@
   }
 
   // One pass over the whole statsLabSource feed builds every build's
-  // chronological W/L sequence at once (keyed off the Match Database's
-  // date, falling back to the shared seq counter when two battles land on
-  // the same date) - far cheaper than re-scanning all battles once per
-  // build row, which is what buildMatchHistoryRows does for the one
-  // expanded row. Feeds both the Form (trend arrow) and Streak columns.
+  // chronological battle-by-battle record at once (keyed off the Match
+  // Database's date, falling back to the shared seq counter when two
+  // battles land on the same date) - far cheaper than re-scanning all
+  // battles once per build row, which is what buildMatchHistoryRows does
+  // for the one expanded row. Feeds the Trend arrow, Streak, and
+  // Volatility Rating columns.
   function buildFormMaps_(data) {
     var matchesById = {};
     (data.matches || []).forEach(function (m) { matchesById[m.matchId] = m; });
@@ -71,8 +79,14 @@
     (data.statsLabSource || []).forEach(function (b) {
       var m = matchesById[b.matchId];
       var date = m ? m.date : null;
-      if (b.buildIdA) (map[b.buildIdA] = map[b.buildIdA] || []).push({ date: date, seq: b.seq, won: b.winnerPlayerId === b.playerAId });
-      if (b.buildIdB) (map[b.buildIdB] = map[b.buildIdB] || []).push({ date: date, seq: b.seq, won: b.winnerPlayerId === b.playerBId });
+      if (b.buildIdA) {
+        var wonA = b.winnerPlayerId === b.playerAId;
+        (map[b.buildIdA] = map[b.buildIdA] || []).push({ date: date, seq: b.seq, won: wonA, pointsFor: wonA ? b.pointsAwarded : 0 });
+      }
+      if (b.buildIdB) {
+        var wonB = b.winnerPlayerId === b.playerBId;
+        (map[b.buildIdB] = map[b.buildIdB] || []).push({ date: date, seq: b.seq, won: wonB, pointsFor: wonB ? b.pointsAwarded : 0 });
+      }
     });
     Object.keys(map).forEach(function (id) {
       map[id].sort(function (x, y) {
@@ -92,6 +106,22 @@
     var count = 0;
     for (var i = wlSequence.length - 1; i >= 0 && wlSequence[i] === last; i--) count++;
     return count + last;
+  }
+
+  // Volatility Rating = standard deviation of points scored per battle
+  // (0 on a loss, the points won on a win - same per-battle points the
+  // Pts/Battle average is built from). Two builds can share an identical
+  // Pts/Battle average while one wins the same way every time and the
+  // other alternates between Xtreme Finishes and losing outright -
+  // standard deviation is what tells those two apart. Returns null (not
+  // 0) below VOLATILITY_MIN_SAMPLE uses, since a tiny sample reads as
+  // falsely "steady" just because there's been nothing to vary yet.
+  function volatilityRating_(sequence) {
+    if (sequence.length < VOLATILITY_MIN_SAMPLE) return null;
+    var pts = sequence.map(function (s) { return s.pointsFor; });
+    var mean = pts.reduce(function (a, b) { return a + b; }, 0) / pts.length;
+    var variance = pts.reduce(function (a, b) { return a + (b - mean) * (b - mean); }, 0) / pts.length;
+    return Math.sqrt(variance);
   }
 
   // matchHistory is only computed for the row currently expanded (see
@@ -117,6 +147,7 @@
       lossFinishDistribution: r.lossFinishDistribution || {},
       last10: wl.slice(-10),
       streak: streakLabel_(wl),
+      volatility: volatilityRating_(sequence),
       matchHistory: includeHistory ? buildMatchHistoryRows(r.buildId, data, partsById, buildsById, playerLookup) : []
     };
   }
@@ -281,7 +312,8 @@
           '<td class="num"><span class="num-cell" style="color:' + R.netRatingColor(e.netRating) + ';font-weight:700;">' + e.netRating.toFixed(2) + '</span></td>' +
           '<td class="num"><span class="num-cell">' + e.pointsPerBattle.toFixed(2) + '</span></td>' +
           '<td style="text-align:center;">' + R.trendBadgeHTML(e.last10) + '</td>' +
-          '<td style="font-family:var(--data);color:' + (e.streak.indexOf("W") !== -1 ? "var(--xtreme)" : e.streak.indexOf("L") !== -1 ? "var(--spin)" : "var(--text-faint)") + ';">' + U.esc(e.streak || "—") + '</td></tr>';
+          '<td style="font-family:var(--data);color:' + (e.streak.indexOf("W") !== -1 ? "var(--xtreme)" : e.streak.indexOf("L") !== -1 ? "var(--spin)" : "var(--text-faint)") + ';">' + U.esc(e.streak || "—") + '</td>' +
+          '<td class="num"><span class="num-cell">' + (e.volatility === null ? '<span class="badge" title="Needs at least ' + VOLATILITY_MIN_SAMPLE + ' uses">n&lt;' + VOLATILITY_MIN_SAMPLE + '</span>' : e.volatility.toFixed(2)) + '</span></td></tr>';
         if (isOpen) {
           rowHTML += '<tr class="build-detail-row"><td colspan="' + colCount + '" style="padding:0;background:var(--bg-elevated);">' + buildDetailHTML(e) + '</td></tr>';
         }
