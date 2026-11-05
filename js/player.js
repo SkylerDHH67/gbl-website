@@ -56,7 +56,7 @@
     html += '<div class="grid grid-4" style="margin-top:20px;">' +
       '<div class="stat-card"><div class="label">Record</div><div class="value">' + (currentRow ? currentRow.wins + '-' + currentRow.losses : "—") + '</div></div>' +
       '<div class="stat-card"><div class="label">Elo</div><div class="value">' + (latestElo !== null ? Math.round(latestElo) : "—") + '</div></div>' +
-      '<div class="stat-card"><div class="label">GBL Win Rating</div><div class="value">' + (currentRating !== null ? currentRating.toFixed(3) : "—") + '</div></div>' +
+      '<div class="stat-card"><div class="label">GBL Win Rating</div><div class="value">' + (currentRating !== null ? R.gblRatingDisplay(currentRating) : "—") + '</div></div>' +
       '<div class="stat-card"><div class="label">Last Stage</div><div class="value" style="font-size:1rem;">' + U.esc(stageLabel) + '</div>' +
       (stageIsActive ? '<div style="margin-top:4px;"><span class="badge live"><span class="dot"></span>ACTIVE</span></div>' : '') + '</div>' +
       '</div>';
@@ -66,7 +66,7 @@
         rows.map(function (r) {
           var st = data.stages[r.stageId];
           var label = st ? ((data.seasons[st.seasonId] || "") + " — " + (st.name || r.stageId)) : r.stageId;
-          return '<tr><td>' + U.esc(label) + '</td><td class="num">' + U.ordinal(r.rank) + '</td><td class="num">' + r.wins + '-' + r.losses + '</td><td class="num" style="font-family:var(--data)">' + U.esc(r.last10 || "—") + '</td><td class="num">' + r.gblRating.toFixed(3) + '</td></tr>';
+          return '<tr><td>' + U.esc(label) + '</td><td class="num">' + U.ordinal(r.rank) + '</td><td class="num">' + r.wins + '-' + r.losses + '</td><td class="num" style="font-family:var(--data)">' + U.esc(r.last10 || "—") + '</td><td class="num">' + R.gblRatingDisplay(r.gblRating) + '</td></tr>';
         }).join("") + '</tbody></table></div></section>';
     } else {
       html += '<div class="panel" style="margin-top:20px;">' + R.emptyBlock("No completed matches yet") + '</div>';

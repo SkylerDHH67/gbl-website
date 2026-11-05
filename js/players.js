@@ -15,7 +15,7 @@
       avatar +
       '<div class="player-card-body"><div class="player-card-name">' + U.esc(p.displayName) + '</div>' +
       countryLine +
-      (rating !== undefined ? '<div class="player-card-rating">Rating ' + rating.toFixed(3) + '</div>' : '') + '</div></a>';
+      (rating !== undefined ? '<div class="player-card-rating">Rating ' + R.gblRatingDisplay(rating) + '</div>' : '') + '</div></a>';
   }
 
   function render(players, ratingByPlayer) {

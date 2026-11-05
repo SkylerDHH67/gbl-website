@@ -107,7 +107,7 @@
     el.innerHTML = '<div class="table-wrap"><table class="data-table"><thead><tr><th>#</th><th>Player</th><th class="num">W-L</th><th class="center">Trend</th><th class="num">Rating</th></tr></thead><tbody>' +
       rows.map(function (r) {
         return '<tr><td class="rank-cell">' + (r.rank <= 3 ? '<span class="rank-badge">' + r.rank + '</span>' : r.rank) + '</td><td><a href="player.html?id=' + encodeURIComponent(r.playerId) + '">' + U.esc(r.displayName) + '</a></td>' +
-          '<td class="num">' + r.wins + '-' + r.losses + '</td><td class="center">' + R.trendBadgeHTML(sequences[r.playerId], 7) + '</td><td class="num">' + r.gblRating.toFixed(3) + '</td></tr>';
+          '<td class="num">' + r.wins + '-' + r.losses + '</td><td class="center">' + R.trendBadgeHTML(sequences[r.playerId], 7) + '</td><td class="num">' + R.gblRatingDisplay(r.gblRating) + '</td></tr>';
       }).join("") + "</tbody></table></div>";
   }
 

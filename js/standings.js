@@ -75,7 +75,7 @@
           '<td class="num">' + r.matchesPlayed + '</td><td class="num">' + r.wins + '-' + r.losses + '</td><td class="num">' + U.pct(r.winPct) + '</td>' +
           '<td class="num">' + r.pointsFor + '</td><td class="num">' + r.pointsAgainst + '</td><td class="num">' + (r.pointDiff > 0 ? "+" : "") + r.pointDiff + '</td>' +
           '<td style="font-family:var(--data)">' + U.esc(r.last10 || "—") + '</td><td class="center">' + R.trendBadgeHTML(sequences[r.playerId], 7) + '</td>' +
-          '<td class="num">' + Math.round(r.elo) + '</td><td class="num">' + r.gblRating.toFixed(3) + '</td></tr>';
+          '<td class="num">' + Math.round(r.elo) + '</td><td class="num">' + R.gblRatingDisplay(r.gblRating) + '</td></tr>';
       }).join("") + "</tbody></table></div>";
 
     el.querySelectorAll("th.sortable").forEach(function (th) {

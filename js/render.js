@@ -431,6 +431,17 @@
     return map;
   }
 
+  // GBL Rating is stored and ranked on its native 0-1 Wilson lower-bound
+  // scale (see RatingEngine.gs) - that's what the Sheet, CSV feed, and sort
+  // logic all use, and changing that scale would mean touching the rating
+  // engine itself. For DISPLAY only, a flat x10 multiplier turns "0.481"
+  // into "4.81," which reads more like a familiar "rating out of 10" than
+  // a raw probability - purely cosmetic, every page should go through this
+  // one function so the display scale can never drift between pages.
+  function gblRatingDisplay(rating) {
+    return (Number(rating) * 10).toFixed(2);
+  }
+
   window.APP_RENDER = {
     loadingBlock: loadingBlock, errorBlock: errorBlock, emptyBlock: emptyBlock,
     playerLookup: playerLookup, playerLookupByName: playerLookupByName,
@@ -441,6 +452,6 @@
     finishBarHTML: finishBarHTML, topFinish: topFinish, netRatingColor: netRatingColor, bladeSlotOf: bladeSlotOf, fullBuildLabel: fullBuildLabel,
     formatRatchetName: formatRatchetName, buildLabelOrFallback: buildLabelOrFallback,
     pickCurrentStageId: pickCurrentStageId, trendInfo: trendInfo, trendBadgeHTML: trendBadgeHTML,
-    playerSequences: playerSequences
+    playerSequences: playerSequences, gblRatingDisplay: gblRatingDisplay
   };
 })();
