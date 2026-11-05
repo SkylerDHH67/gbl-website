@@ -248,26 +248,22 @@
     return fullBuildLabel(build, partsById) || "Unlisted Build";
   }
 
-  // Trend methodology (whole season): split the season's W/L results in
-  // half - first half vs second half - and compare win rates. "Second half
-  // win rate minus first half win rate" is a standard, easy-to-explain read
-  // on whether an entity is doing better or worse now than earlier in the
-  // same season, using every result rather than an arbitrary "last N" slice.
-  // A swing of 20+ percentage points either way calls it trending up/down;
-  // less than that reads as steady.
+  // Trend methodology (whole season): a heat-mapped sparkline of rolling win
+  // rate - the line's COLOR is read directly off the win percentage at each
+  // point as it moves through the season, not off a separate "trending up/
+  // down" calculation. A hot streak glows turquoise, a cold one glows red,
+  // and you can watch the color itself shift battle to battle - that's the
+  // heatmap the sheet owner asked for, in place of the earlier half-season-
+  // swing-based single color.
   //
-  // This fixed 20pt bar (not scaled to sample size) is a deliberate choice.
-  // An earlier version scaled the required swing to each entity's own
-  // sample size (demanding a much bigger swing from a thin season than a
-  // long one, to control for noise) - that was the more "statistically
-  // correct" approach, but at this league's current sample sizes it made
-  // almost everything read as Steady, which wasn't useful. A single fixed
-  // threshold is simpler and more legible, and it has the property the
-  // sheet owner asked about directly: readings get MORE reliable over time
-  // without retuning anything, because a true 50/50 player's real half-to-
-  // half swing naturally shrinks as more games pile up on both sides, while
-  // the 20pt bar stays put - so early-season colors should be taken as a
-  // rough, sometimes-noisy read, and they'll firm up as the season goes on.
+  // Color bands (by rolling win rate):
+  //   < 42%        solid red       - below break-even by a real margin
+  //   42% – 57%    yellow -> green - the "around even" zone, trending green
+  //                                  as it climbs toward a real winning edge
+  //   57% – 74%    solid green     - a genuinely strong win rate
+  //   74% – 100%   green -> teal   - elite, saturating into neon turquoise
+  // Between the named bands the color is linearly interpolated, so the line
+  // reads as a true continuous heatmap rather than hard color jumps.
   //
   // The minimum sample before a trend line shows at all is passed in per
   // call site rather than fixed here, because "enough history to trust a
@@ -278,9 +274,43 @@
   // already uses for Volatility, so a build's Trend and Volatility columns
   // agree on what counts as "enough data."
   var TREND_MIN_TOTAL_SAMPLE_DEFAULT = 10;
-  var TREND_SWING_THRESHOLD = 0.2;
-  var TREND_ROLLING_WINDOW = 5;     // visual smoothing only (see rollingSeries_) - never affects the up/down/steady call
+  var TREND_ROLLING_WINDOW = 5;     // visual smoothing only (see rollingSeries_)
   var TREND_SPARKLINE_MAX_POINTS = 24;
+
+  // Color stops the heatmap interpolates between. Below the first stop's
+  // percentage, the color is flat (no further reddening toward 0%) - "below
+  // 42%" is just "red," not a gradient down to some darker red.
+  var TREND_COLOR_STOPS = [
+    { pct: 0.00, rgb: [239, 62, 74] },   // red (var(--spin)) - flat through 42%
+    { pct: 0.42, rgb: [239, 62, 74] },
+    { pct: 0.42, rgb: [255, 197, 61] },  // yellow (var(--gold)) - hard step into the 42-57 band
+    { pct: 0.57, rgb: [57, 255, 106] },  // green (var(--xtreme))
+    { pct: 0.74, rgb: [57, 255, 106] },  // still green - flat "really green" plateau 57-74
+    { pct: 1.00, rgb: [38, 232, 220] }   // neon turquoise - saturates as it approaches 100%
+  ];
+
+  function lerp_(a, b, t) { return a + (b - a) * t; }
+
+  // Linearly interpolates a win-rate (0-1) to an "rgb(r,g,b)" string across
+  // TREND_COLOR_STOPS. Duplicate pct entries (e.g. the 0.42/0.42 pair above)
+  // create an intentional hard step rather than a gradient at that point.
+  function winPctColor_(pct) {
+    pct = Math.max(0, Math.min(1, pct));
+    var stops = TREND_COLOR_STOPS;
+    for (var i = 0; i < stops.length - 1; i++) {
+      var a = stops[i], b = stops[i + 1];
+      if (pct >= a.pct && pct <= b.pct) {
+        var span = b.pct - a.pct;
+        var t = span > 0 ? (pct - a.pct) / span : 1;
+        var r = Math.round(lerp_(a.rgb[0], b.rgb[0], t));
+        var g = Math.round(lerp_(a.rgb[1], b.rgb[1], t));
+        var bch = Math.round(lerp_(a.rgb[2], b.rgb[2], t));
+        return "rgb(" + r + "," + g + "," + bch + ")";
+      }
+    }
+    var last = stops[stops.length - 1].rgb;
+    return "rgb(" + last[0] + "," + last[1] + "," + last[2] + ")";
+  }
 
   function winPct_(str) {
     if (!str.length) return 0;
@@ -301,30 +331,25 @@
     var threshold = (minSample === undefined || minSample === null) ? TREND_MIN_TOTAL_SAMPLE_DEFAULT : minSample;
     if (n < threshold) return null;
 
-    var half = Math.floor(n / 2);
-    var firstHalf = s.slice(0, half);
-    var secondHalf = s.slice(n - half); // drops the single middle game when n is odd, so both halves stay equal size
     var overallPct = winPct_(s);
-    var diff = winPct_(secondHalf) - winPct_(firstHalf);
-
-    var dir, color, label;
-    if (diff >= TREND_SWING_THRESHOLD) { dir = "up"; color = "var(--xtreme)"; label = "Trending up"; }
-    else if (diff <= -TREND_SWING_THRESHOLD) { dir = "down"; color = "var(--spin)"; label = "Trending down"; }
-    else { dir = "flat"; color = "var(--gold)"; label = "Steady"; }
-
     var ys = [];
     for (var i = 0; i < n; i++) ys.push(s[i] === "W" ? 1 : 0);
 
-    return { dir: dir, color: color, label: label, series: ys, overallPct: overallPct, diff: diff, n: n };
+    var recentWindow = Math.min(TREND_ROLLING_WINDOW, n);
+    var recentSum = 0;
+    for (var j = n - recentWindow; j < n; j++) recentSum += ys[j];
+    var recentPct = recentSum / recentWindow;
+
+    return { series: ys, overallPct: overallPct, recentPct: recentPct, n: n };
   }
 
   // Trailing rolling average (window TREND_ROLLING_WINDOW, shrinking at the
   // very start so the line is defined from game 1) - this is what actually
-  // gets drawn. A plain cumulative average flattens out and stops moving
-  // the more games are added, which looks dead for a long season even when
-  // recent form has genuinely shifted; a short rolling window keeps the
-  // line visually alive across the whole season. The up/down/steady CALL
-  // above still comes from the unsmoothed full-season regression, not this.
+  // gets drawn AND what drives each segment's heatmap color. A plain
+  // cumulative average flattens out and stops moving the more games are
+  // added, which looks dead for a long season even when recent form has
+  // genuinely shifted; a short rolling window keeps the line (and its
+  // color) visually alive across the whole season.
   function rollingSeries_(ys, window) {
     var out = [];
     for (var i = 0; i < ys.length; i++) {
@@ -348,29 +373,40 @@
     return out;
   }
 
-  // Tiny inline sparkline of the whole season's rolling win rate - a real
-  // little trend line rather than a static arrow glyph, colored to match
-  // the up/steady/down read above.
-  function sparklineSVG_(points, color) {
+  // Tiny inline sparkline of the whole season's rolling win rate, drawn as a
+  // series of short segments rather than one polyline so EACH segment can be
+  // colored by the rolling win rate at that point in the season - a real
+  // heatmap trend line, not a single color for the whole thing. A segment's
+  // color comes from the average of its two endpoint values so the color
+  // transition lines up visually with the line's own slope.
+  function sparklineSVG_(points) {
     var n = points.length;
     if (n < 2) return "";
     var w = 56, h = 16, pad = 2;
     var coords = points.map(function (v, i) {
       var x = pad + (i / (n - 1)) * (w - pad * 2);
       var y = h - pad - v * (h - pad * 2);
-      return x.toFixed(1) + "," + y.toFixed(1);
-    }).join(" ");
+      return { x: x, y: y };
+    });
+    var segments = "";
+    for (var i = 0; i < coords.length - 1; i++) {
+      var segPct = (points[i] + points[i + 1]) / 2;
+      var color = winPctColor_(segPct);
+      segments += '<line x1="' + coords[i].x.toFixed(1) + '" y1="' + coords[i].y.toFixed(1) +
+        '" x2="' + coords[i + 1].x.toFixed(1) + '" y2="' + coords[i + 1].y.toFixed(1) +
+        '" stroke="' + color + '" stroke-width="1.6" stroke-linecap="round"/>';
+    }
     return '<svg width="' + w + '" height="' + h + '" viewBox="0 0 ' + w + ' ' + h + '" style="display:block;overflow:visible;">' +
-      '<polyline points="' + coords + '" fill="none" stroke="' + color + '" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>' +
-      '</svg>';
+      segments + '</svg>';
   }
 
   function trendBadgeHTML(fullSequence, minSample) {
     var t = trendInfo(fullSequence, minSample);
     if (!t) return '<span style="color:var(--text-faint);">—</span>';
     var rolling = decimate_(rollingSeries_(t.series, TREND_ROLLING_WINDOW), TREND_SPARKLINE_MAX_POINTS);
-    var title = t.label + " — " + t.n + " this season, " + Math.round(t.overallPct * 100) + "% overall";
-    return '<span title="' + U.esc(title) + '">' + sparklineSVG_(rolling, t.color) + '</span>';
+    var title = Math.round(t.recentPct * 100) + "% last " + Math.min(TREND_ROLLING_WINDOW, t.n) +
+      " · " + Math.round(t.overallPct * 100) + "% season · " + t.n + " battles";
+    return '<span title="' + U.esc(title) + '">' + sparklineSVG_(rolling) + '</span>';
   }
 
   // Builds a map of playerId -> full chronological "WWLWL..." match history
