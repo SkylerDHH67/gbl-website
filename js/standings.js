@@ -68,12 +68,13 @@
     var baseRows = data.standings.filter(function (s) { return s.stageId === activeStageId; });
     if (!baseRows.length) { el.innerHTML = R.emptyBlock("No standings for this stage yet", "Standings appear once players have completed matches here."); return; }
     var rows = sortRows(baseRows, lookup);
+    var sequences = R.playerSequences(data);
     el.innerHTML = '<div class="table-wrap"><table class="data-table"><thead>' + renderHeaderRow() + '</thead><tbody>' + rows.map(function (r) {
         return '<tr><td class="rank-cell">' + (r.rank <= 3 ? '<span class="rank-badge">' + r.rank + '</span>' : r.rank) + '</td>' +
           '<td>' + R.playerCellWithLogoHTML(lookup(r.playerId)) + '</td>' +
           '<td class="num">' + r.matchesPlayed + '</td><td class="num">' + r.wins + '-' + r.losses + '</td><td class="num">' + U.pct(r.winPct) + '</td>' +
           '<td class="num">' + r.pointsFor + '</td><td class="num">' + r.pointsAgainst + '</td><td class="num">' + (r.pointDiff > 0 ? "+" : "") + r.pointDiff + '</td>' +
-          '<td style="font-family:var(--data)">' + U.esc(r.last10 || "—") + '</td><td class="center">' + R.trendBadgeHTML(r.last10) + '</td>' +
+          '<td style="font-family:var(--data)">' + U.esc(r.last10 || "—") + '</td><td class="center">' + R.trendBadgeHTML(sequences[r.playerId]) + '</td>' +
           '<td class="num">' + Math.round(r.elo) + '</td><td class="num">' + r.gblRating.toFixed(3) + '</td></tr>';
       }).join("") + "</tbody></table></div>";
 

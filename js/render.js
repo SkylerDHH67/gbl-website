@@ -248,37 +248,94 @@
     return fullBuildLabel(build, partsById) || "Unlisted Build";
   }
 
-  // Standings' last10 string is built chronologically oldest-to-newest
-  // (RatingEngine.gs: `results.slice(-10).join("")`), so splitting it in
-  // half and comparing the older half's win rate to the more recent half's
-  // is a real trend read, not just a random split. Requires at least 4
-  // results before calling a trend at all - same small-sample guard used
-  // everywhere else on the site, since a 1-1 record split into two single
-  // games would otherwise read as a dramatic swing.
-  var TREND_MIN_RESULTS = 4;
-  var TREND_SWING_THRESHOLD = 0.2; // >=20pt win-rate swing between halves to call up/down rather than flat
+  // Trend methodology: compare the win rate in the last 10 games/battles
+  // against the entity's win rate across its FULL known history (not the
+  // last-10 window itself) - "have they been running hotter or colder than
+  // their real level lately," not "did they do better in games 6-10 than
+  // 1-5." A swing of 20 percentage points or more either way calls it
+  // trending up/down; inside that +/-20pt band (40pt total) reads as steady.
+  // Needs real history to compare against - at least 15 total results (the
+  // last 10 plus a baseline of 5+ before that) or it shows as a dash rather
+  // than a falsely confident read on a thin sample.
+  var TREND_MIN_TOTAL_SAMPLE = 15;
+  var TREND_MIN_LAST10 = 5;
+  var TREND_SWING_THRESHOLD = 0.2; // +/-20 percentage points vs all-time win rate
 
-  function trendInfo(last10) {
-    var s = String(last10 || "").replace(/[^WL]/gi, "").toUpperCase();
-    if (s.length < TREND_MIN_RESULTS) return null;
-    var mid = Math.floor(s.length / 2);
-    var older = s.slice(0, mid), recent = s.slice(mid);
+  // fullSequence: chronological "WWLWL..." string (oldest first) across the
+  // entity's ENTIRE known history - builds.js already tracks this per build;
+  // standings/home build the player equivalent from data.matches (see
+  // APP_RENDER.playerSequences). Passing only a last-10 string here isn't
+  // enough data to score a trend and will just fall through to null.
+  function trendInfo(fullSequence) {
+    var s = String(fullSequence || "").replace(/[^WL]/gi, "").toUpperCase();
+    if (s.length < TREND_MIN_TOTAL_SAMPLE) return null;
+    var last10 = s.slice(-10);
+    if (last10.length < TREND_MIN_LAST10) return null;
     function winPct(str) {
       if (!str.length) return 0;
       var w = 0;
       for (var i = 0; i < str.length; i++) if (str[i] === "W") w++;
       return w / str.length;
     }
-    var diff = winPct(recent) - winPct(older);
-    if (diff >= TREND_SWING_THRESHOLD) return { dir: "up", color: "var(--xtreme)", arrow: "▲", label: "Trending up" };
-    if (diff <= -TREND_SWING_THRESHOLD) return { dir: "down", color: "var(--spin)", arrow: "▼", label: "Trending down" };
-    return { dir: "flat", color: "var(--gold)", arrow: "▬", label: "Steady" };
+    var overallPct = winPct(s);
+    var last10Pct = winPct(last10);
+    var diff = last10Pct - overallPct;
+    var dir, color, label;
+    if (diff >= TREND_SWING_THRESHOLD) { dir = "up"; color = "var(--xtreme)"; label = "Trending up"; }
+    else if (diff <= -TREND_SWING_THRESHOLD) { dir = "down"; color = "var(--spin)"; label = "Trending down"; }
+    else { dir = "flat"; color = "var(--gold)"; label = "Steady"; }
+    return { dir: dir, color: color, label: label, last10: last10, last10Pct: last10Pct, overallPct: overallPct, diff: diff };
   }
 
-  function trendBadgeHTML(last10) {
-    var t = trendInfo(last10);
+  // Tiny inline sparkline of the cumulative win rate across the last 10
+  // games/battles - a real little trend line rather than a static arrow
+  // glyph, colored to match the up/steady/down read above.
+  function sparklineSVG_(last10, color) {
+    var n = last10.length;
+    if (n < 2) return "";
+    var cum = 0, pts = [];
+    for (var i = 0; i < n; i++) {
+      cum += last10[i] === "W" ? 1 : 0;
+      pts.push(cum / (i + 1));
+    }
+    var w = 34, h = 14, pad = 2;
+    var coords = pts.map(function (v, i) {
+      var x = pad + (n === 1 ? 0 : (i / (n - 1)) * (w - pad * 2));
+      var y = h - pad - v * (h - pad * 2);
+      return x.toFixed(1) + "," + y.toFixed(1);
+    }).join(" ");
+    return '<svg width="' + w + '" height="' + h + '" viewBox="0 0 ' + w + ' ' + h + '" style="display:block;overflow:visible;">' +
+      '<polyline points="' + coords + '" fill="none" stroke="' + color + '" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>' +
+      '</svg>';
+  }
+
+  function trendBadgeHTML(fullSequence) {
+    var t = trendInfo(fullSequence);
     if (!t) return '<span style="color:var(--text-faint);">—</span>';
-    return '<span style="color:' + t.color + ';font-weight:800;" title="' + U.esc(t.label) + '">' + t.arrow + '</span>';
+    var title = t.label + " — last 10: " + Math.round(t.last10Pct * 100) + "% vs " + Math.round(t.overallPct * 100) + "% all-time";
+    return '<span title="' + U.esc(title) + '">' + sparklineSVG_(t.last10, t.color) + '</span>';
+  }
+
+  // Builds a map of playerId -> full chronological "WWLWL..." match history
+  // (oldest first, every COMPLETE match regardless of stage/season) for the
+  // Trend sparkline - the standings feed only carries a precomputed last-10
+  // string, which isn't enough history to compare against an all-time rate.
+  function playerSequences(data) {
+    var map = {};
+    (data.matches || [])
+      .filter(function (m) { return m.status === "COMPLETE" && m.winnerPlayerId; })
+      .slice()
+      .sort(function (a, b) {
+        var at = a.date ? new Date(a.date).getTime() : 0, bt = b.date ? new Date(b.date).getTime() : 0;
+        if (at !== bt) return at - bt;
+        return String(a.matchId).localeCompare(String(b.matchId));
+      })
+      .forEach(function (m) {
+        if (m.playerAId) (map[m.playerAId] = map[m.playerAId] || []).push(m.winnerPlayerId === m.playerAId ? "W" : "L");
+        if (m.playerBId) (map[m.playerBId] = map[m.playerBId] || []).push(m.winnerPlayerId === m.playerBId ? "W" : "L");
+      });
+    Object.keys(map).forEach(function (id) { map[id] = map[id].join(""); });
+    return map;
   }
 
   window.APP_RENDER = {
@@ -290,6 +347,7 @@
     FINISH_LABELS: FINISH_LABELS, FINISH_COLORS: FINISH_COLORS, FINISH_ORDER: FINISH_ORDER,
     finishBarHTML: finishBarHTML, topFinish: topFinish, netRatingColor: netRatingColor, bladeSlotOf: bladeSlotOf, fullBuildLabel: fullBuildLabel,
     formatRatchetName: formatRatchetName, buildLabelOrFallback: buildLabelOrFallback,
-    pickCurrentStageId: pickCurrentStageId, trendInfo: trendInfo, trendBadgeHTML: trendBadgeHTML
+    pickCurrentStageId: pickCurrentStageId, trendInfo: trendInfo, trendBadgeHTML: trendBadgeHTML,
+    playerSequences: playerSequences
   };
 })();

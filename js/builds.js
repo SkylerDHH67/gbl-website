@@ -149,6 +149,7 @@
       finishDistribution: r.finishDistribution || {},
       lossFinishDistribution: r.lossFinishDistribution || {},
       last10: wl.slice(-10),
+      fullForm: wl,
       streak: streakLabel_(wl),
       volatility: volatilityRating_(sequence),
       matchHistory: includeHistory ? buildMatchHistoryRows(r.buildId, data, partsById, buildsById, playerLookup) : []
@@ -313,7 +314,7 @@
           '<td class="num"><span class="num-cell">' + e.pointsAgainst + '</span></td>' +
           '<td class="num"><span class="num-cell" style="color:' + R.netRatingColor(e.netRating) + ';font-weight:700;">' + e.netRating.toFixed(2) + '</span></td>' +
           '<td class="num"><span class="num-cell">' + e.pointsPerBattle.toFixed(2) + '</span></td>' +
-          '<td class="center">' + R.trendBadgeHTML(e.last10) + '</td>' +
+          '<td class="center">' + R.trendBadgeHTML(e.fullForm) + '</td>' +
           '<td class="center" style="font-family:var(--data);color:' + (e.streak.indexOf("W") !== -1 ? "var(--xtreme)" : e.streak.indexOf("L") !== -1 ? "var(--spin)" : "var(--text-faint)") + ';">' + U.esc(e.streak || "—") + '</td>' +
           '<td class="num"><span class="num-cell">' + (e.volatility === null ? '<span class="badge" title="Needs at least ' + VOLATILITY_MIN_SAMPLE + ' uses">n&lt;' + VOLATILITY_MIN_SAMPLE + '</span>' : e.volatility.toFixed(2)) + '</span></td></tr>';
         if (isOpen) {
