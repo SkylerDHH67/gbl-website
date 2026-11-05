@@ -30,14 +30,18 @@
     { key: "volatility", label: "Volatility", num: true, sortable: true }
   ];
 
-  // A build needs at least this many recorded uses before Volatility Rating
-  // is shown at all - standard deviation of a tiny sample is noise, not a
-  // real read on how predictable a build is, and "most/least volatile"
-  // rankings specifically need a real sample to mean anything. Kept
-  // separate from the lighter LOW_SAMPLE_THRESHOLD badge used for things
-  // like win rate elsewhere on this page, since volatility (a measure of
-  // spread) needs more data points than a simple average to be trustworthy.
-  var VOLATILITY_MIN_SAMPLE = 10;
+  // A build needs at least this many recorded uses before any of its rate/
+  // average-based stats are presented as real numbers - Win Rate, Pts For,
+  // Pts Against, Net Rating, Pts/Battle, and Volatility all get noisier the
+  // fewer battles they're built from, and a 2-use build going 2-0 shouldn't
+  // rank above a 40-use build going 28-12 just because 100% beats 70%. Below
+  // this many uses, each of those columns shows an "insufficient sample"
+  // badge instead of the number and sorts to the bottom regardless of sort
+  // direction (see sortRows) - the same treatment Volatility already had,
+  // now applied consistently across every derived-stat column. Raw counts
+  // (Used, W-L) aren't gated since they're the sample size itself, not a
+  // rate computed from it - there's nothing misleading about a true "2-0."
+  var BUILD_STAT_MIN_SAMPLE = 10;
 
 
   function partsLookup(parts) {
@@ -120,10 +124,10 @@
   // Pts/Battle average while one wins the same way every time and the
   // other alternates between Xtreme Finishes and losing outright -
   // standard deviation is what tells those two apart. Returns null (not
-  // 0) below VOLATILITY_MIN_SAMPLE uses, since a tiny sample reads as
+  // 0) below BUILD_STAT_MIN_SAMPLE uses, since a tiny sample reads as
   // falsely "steady" just because there's been nothing to vary yet.
   function volatilityRating_(sequence) {
-    if (sequence.length < VOLATILITY_MIN_SAMPLE) return null;
+    if (sequence.length < BUILD_STAT_MIN_SAMPLE) return null;
     var pts = sequence.map(function (s) { return s.pointsFor; });
     var mean = pts.reduce(function (a, b) { return a + b; }, 0) / pts.length;
     var variance = pts.reduce(function (a, b) { return a + (b - mean) * (b - mean); }, 0) / pts.length;
@@ -139,6 +143,13 @@
     var bladePart = slot && partsById[slot.pid];
     var sequence = (formMaps && formMaps[r.buildId]) || [];
     var wl = sequence.map(function (s) { return s.won ? "W" : "L"; }).join("");
+    // Every rate/average column (not the raw Used/W-L counts) reads as null
+    // below BUILD_STAT_MIN_SAMPLE uses - see the constant's comment. The
+    // underlying numbers are still kept on the row (prefixed raw*) so the
+    // build detail panel, which a user explicitly opened for this one
+    // build, can still show its real small-sample numbers rather than
+    // hiding data someone deliberately asked to see.
+    var sufficientSample = r.timesUsed >= BUILD_STAT_MIN_SAMPLE;
     return {
       raw: r,
       build: build,
@@ -147,8 +158,14 @@
       bladeName: bladePart ? bladePart.displayName : "",
       playerName: playerLookup(r.playerId).displayName,
       timesUsed: r.timesUsed, timesWon: r.timesWon, timesLost: Math.max(0, r.timesUsed - r.timesWon),
-      winRate: r.winRate, pointsScored: r.pointsScored, pointsAgainst: r.pointsAgainst, netRating: r.netRating,
-      pointsPerBattle: r.pointsPerBattle,
+      sufficientSample: sufficientSample,
+      winRate: sufficientSample ? r.winRate : null,
+      pointsScored: sufficientSample ? r.pointsScored : null,
+      pointsAgainst: sufficientSample ? r.pointsAgainst : null,
+      netRating: sufficientSample ? r.netRating : null,
+      pointsPerBattle: sufficientSample ? r.pointsPerBattle : null,
+      rawWinRate: r.winRate, rawPointsScored: r.pointsScored, rawPointsAgainst: r.pointsAgainst,
+      rawNetRating: r.netRating, rawPointsPerBattle: r.pointsPerBattle,
       finishDistribution: r.finishDistribution || {},
       lossFinishDistribution: r.lossFinishDistribution || {},
       last10: wl.slice(-10),
@@ -238,12 +255,13 @@
       '<div class="eyebrow" style="margin:16px 0 10px;">When ' + U.esc(e.label) + ' Loses</div>' +
       R.finishBarHTML(e.lossFinishDistribution) +
       '<div style="display:flex;gap:22px;flex-wrap:wrap;margin-top:14px;font-size:0.85rem;color:var(--text-dim);">' +
-      '<span><strong style="color:var(--text);">' + U.pct(e.winRate) + '</strong> win rate</span>' +
-      '<span><strong style="color:var(--text);">' + e.pointsScored + '</strong> pts for</span>' +
-      '<span><strong style="color:var(--text);">' + e.pointsAgainst + '</strong> pts against</span>' +
-      '<span><strong style="color:' + R.netRatingColor(e.netRating) + ';">' + e.netRating.toFixed(2) + '</strong> net rating</span>' +
-      '<span><strong style="color:var(--text);">' + e.pointsPerBattle.toFixed(2) + '</strong> pts/battle</span>' +
+      '<span><strong style="color:var(--text);">' + U.pct(e.rawWinRate) + '</strong> win rate</span>' +
+      '<span><strong style="color:var(--text);">' + e.rawPointsScored + '</strong> pts for</span>' +
+      '<span><strong style="color:var(--text);">' + e.rawPointsAgainst + '</strong> pts against</span>' +
+      '<span><strong style="color:' + R.netRatingColor(e.rawNetRating) + ';">' + e.rawNetRating.toFixed(2) + '</strong> net rating</span>' +
+      '<span><strong style="color:var(--text);">' + e.rawPointsPerBattle.toFixed(2) + '</strong> pts/battle</span>' +
       '<span><strong style="color:var(--text);">' + e.timesWon + '-' + e.timesLost + '</strong> battle record</span>' +
+      (e.sufficientSample ? "" : '<span style="color:var(--text-faint);">Table stats above show as n&lt;' + BUILD_STAT_MIN_SAMPLE + ' with only ' + e.timesUsed + ' use' + (e.timesUsed === 1 ? "" : "s") + ' so far - numbers here are this build\'s real record, just not enough yet to rank fairly against heavily-used builds.</span>') +
       '</div>' +
       matchHistoryHTML(e.matchHistory || []) +
       '</div>';
@@ -316,19 +334,23 @@
         var lowSample = e.timesUsed < LOW_SAMPLE_THRESHOLD;
         var sampleBadge = lowSample ? '<span class="badge" title="Small sample size">n&lt;' + LOW_SAMPLE_THRESHOLD + '</span>' : '';
         var isOpen = expandedBuildId === e.raw.buildId;
+        // Shared "not enough uses yet" badge for every gated rate/average
+        // column - same look as Volatility's existing one, now reused
+        // everywhere that column is null for the same reason.
+        var insufficientBadge = '<span class="badge" title="Needs at least ' + BUILD_STAT_MIN_SAMPLE + ' uses">n&lt;' + BUILD_STAT_MIN_SAMPLE + '</span>';
         var rowHTML = '<tr class="build-row" data-build-id="' + U.esc(e.raw.buildId) + '" style="cursor:pointer;">' +
           '<td><span class="build-cell"><span class="sort-arrow" style="opacity:0.5;">' + (isOpen ? "▾" : "▸") + '</span>' + img + '<span style="font-family:var(--data)">' + U.esc(e.label) + '</span></span></td>' +
           '<td>' + U.esc(e.playerName) + '</td>' +
           '<td class="num"><span class="num-cell">' + sampleBadge + e.timesUsed + '</span></td>' +
           '<td class="num"><span class="num-cell">' + e.timesWon + '-' + e.timesLost + '</span></td>' +
-          '<td class="num"><span class="num-cell">' + U.pct(e.winRate) + '</span></td>' +
-          '<td class="num"><span class="num-cell">' + e.pointsScored + '</span></td>' +
-          '<td class="num"><span class="num-cell">' + e.pointsAgainst + '</span></td>' +
-          '<td class="num"><span class="num-cell" style="color:' + R.netRatingColor(e.netRating) + ';font-weight:700;">' + e.netRating.toFixed(2) + '</span></td>' +
-          '<td class="num"><span class="num-cell">' + e.pointsPerBattle.toFixed(2) + '</span></td>' +
-          '<td class="center">' + R.trendBadgeHTML(e.fullForm) + '</td>' +
+          '<td class="num"><span class="num-cell">' + (e.winRate === null ? insufficientBadge : U.pct(e.winRate)) + '</span></td>' +
+          '<td class="num"><span class="num-cell">' + (e.pointsScored === null ? insufficientBadge : e.pointsScored) + '</span></td>' +
+          '<td class="num"><span class="num-cell">' + (e.pointsAgainst === null ? insufficientBadge : e.pointsAgainst) + '</span></td>' +
+          '<td class="num"><span class="num-cell"' + (e.netRating === null ? "" : ' style="color:' + R.netRatingColor(e.netRating) + ';font-weight:700;"') + '>' + (e.netRating === null ? insufficientBadge : e.netRating.toFixed(2)) + '</span></td>' +
+          '<td class="num"><span class="num-cell">' + (e.pointsPerBattle === null ? insufficientBadge : e.pointsPerBattle.toFixed(2)) + '</span></td>' +
+          '<td class="center">' + R.trendBadgeHTML(e.fullForm, BUILD_STAT_MIN_SAMPLE) + '</td>' +
           '<td class="center" style="font-family:var(--data);color:' + (e.streak.indexOf("W") !== -1 ? "var(--xtreme)" : e.streak.indexOf("L") !== -1 ? "var(--spin)" : "var(--text-faint)") + ';">' + U.esc(e.streak || "—") + '</td>' +
-          '<td class="num"><span class="num-cell">' + (e.volatility === null ? '<span class="badge" title="Needs at least ' + VOLATILITY_MIN_SAMPLE + ' uses">n&lt;' + VOLATILITY_MIN_SAMPLE + '</span>' : e.volatility.toFixed(2)) + '</span></td></tr>';
+          '<td class="num"><span class="num-cell">' + (e.volatility === null ? insufficientBadge : e.volatility.toFixed(2)) + '</span></td></tr>';
         if (isOpen) {
           rowHTML += '<tr class="build-detail-row"><td colspan="' + colCount + '" style="padding:0;background:var(--bg-elevated);">' + buildDetailHTML(e) + '</td></tr>';
         }

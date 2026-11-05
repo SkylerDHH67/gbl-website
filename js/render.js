@@ -268,7 +268,16 @@
   // half swing naturally shrinks as more games pile up on both sides, while
   // the 20pt bar stays put - so early-season colors should be taken as a
   // rough, sometimes-noisy read, and they'll firm up as the season goes on.
-  var TREND_MIN_TOTAL_SAMPLE = 10;
+  //
+  // The minimum sample before a trend line shows at all is passed in per
+  // call site rather than fixed here, because "enough history to trust a
+  // trend" means something different on different pages: a player's
+  // standings row (every match they've ever played) reaches a meaningful
+  // sample sooner than a single build's usage count, so standings/home use
+  // a lower bar (7) while the Builds page keeps the stricter one (10) it
+  // already uses for Volatility, so a build's Trend and Volatility columns
+  // agree on what counts as "enough data."
+  var TREND_MIN_TOTAL_SAMPLE_DEFAULT = 10;
   var TREND_SWING_THRESHOLD = 0.2;
   var TREND_ROLLING_WINDOW = 5;     // visual smoothing only (see rollingSeries_) - never affects the up/down/steady call
   var TREND_SPARKLINE_MAX_POINTS = 24;
@@ -283,11 +292,14 @@
   // fullSequence: chronological "WWLWL..." string (oldest first) across the
   // entity's ENTIRE known history this season - builds.js already tracks
   // this per build; standings/home build the player equivalent from
-  // data.matches (see APP_RENDER.playerSequences).
-  function trendInfo(fullSequence) {
+  // data.matches (see APP_RENDER.playerSequences). minSample: how many
+  // total games/battles are required before a trend read is shown at all;
+  // defaults to TREND_MIN_TOTAL_SAMPLE_DEFAULT when omitted.
+  function trendInfo(fullSequence, minSample) {
     var s = String(fullSequence || "").replace(/[^WL]/gi, "").toUpperCase();
     var n = s.length;
-    if (n < TREND_MIN_TOTAL_SAMPLE) return null;
+    var threshold = (minSample === undefined || minSample === null) ? TREND_MIN_TOTAL_SAMPLE_DEFAULT : minSample;
+    if (n < threshold) return null;
 
     var half = Math.floor(n / 2);
     var firstHalf = s.slice(0, half);
@@ -353,8 +365,8 @@
       '</svg>';
   }
 
-  function trendBadgeHTML(fullSequence) {
-    var t = trendInfo(fullSequence);
+  function trendBadgeHTML(fullSequence, minSample) {
+    var t = trendInfo(fullSequence, minSample);
     if (!t) return '<span style="color:var(--text-faint);">—</span>';
     var rolling = decimate_(rollingSeries_(t.series, TREND_ROLLING_WINDOW), TREND_SPARKLINE_MAX_POINTS);
     var title = t.label + " — " + t.n + " this season, " + Math.round(t.overallPct * 100) + "% overall";
