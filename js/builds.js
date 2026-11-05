@@ -31,10 +31,13 @@
   ];
 
   // A build needs at least this many recorded uses before Volatility Rating
-  // is shown at all - standard deviation of a 2-battle sample is noise, not
-  // a real read on how predictable a build is. Reuses the same threshold
-  // the "small sample" badge elsewhere on this page already uses.
-  var VOLATILITY_MIN_SAMPLE = LOW_SAMPLE_THRESHOLD;
+  // is shown at all - standard deviation of a tiny sample is noise, not a
+  // real read on how predictable a build is, and "most/least volatile"
+  // rankings specifically need a real sample to mean anything. Kept
+  // separate from the lighter LOW_SAMPLE_THRESHOLD badge used for things
+  // like win rate elsewhere on this page, since volatility (a measure of
+  // spread) needs more data points than a simple average to be trustworthy.
+  var VOLATILITY_MIN_SAMPLE = 10;
 
 
   function partsLookup(parts) {
@@ -253,6 +256,15 @@
       if (sortKey === "build") { av = a.label.toLowerCase(); bv = b.label.toLowerCase(); }
       else if (sortKey === "player") { av = a.playerName.toLowerCase(); bv = b.playerName.toLowerCase(); }
       else { av = a[sortKey]; bv = b[sortKey]; }
+      // Insufficient-sample values (null, e.g. Volatility below
+      // VOLATILITY_MIN_SAMPLE uses) always sort to the bottom no matter
+      // which direction is active - a small-sample "n/a" should never
+      // outrank a real number just because the sort flipped to ascending.
+      var aNull = av === null || av === undefined;
+      var bNull = bv === null || bv === undefined;
+      if (aNull && bNull) return 0;
+      if (aNull) return 1;
+      if (bNull) return -1;
       if (av < bv) return -1 * dir;
       if (av > bv) return 1 * dir;
       return 0;

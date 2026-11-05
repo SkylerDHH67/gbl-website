@@ -248,54 +248,62 @@
     return fullBuildLabel(build, partsById) || "Unlisted Build";
   }
 
-  // Trend methodology: compare the win rate in the last 10 games/battles
-  // against the entity's win rate across its FULL known history (not the
-  // last-10 window itself) - "have they been running hotter or colder than
-  // their real level lately," not "did they do better in games 6-10 than
-  // 1-5." A swing of 20 percentage points or more either way calls it
-  // trending up/down; inside that +/-20pt band (40pt total) reads as steady.
-  // Needs real history to compare against - at least 15 total results (the
-  // last 10 plus a baseline of 5+ before that) or it shows as a dash rather
-  // than a falsely confident read on a thin sample.
-  var TREND_MIN_TOTAL_SAMPLE = 15;
-  var TREND_MIN_LAST10 = 5;
+  // Trend methodology: compare the win rate in a "recent" window against
+  // the entity's win rate across its FULL known history - "have they been
+  // running hotter or colder than their real level lately." A swing of 20
+  // percentage points or more either way calls it trending up/down; inside
+  // that +/-20pt band (40pt total) reads as steady.
+  //
+  // The recent window is capped at 10 but SHRINKS for a thinner history
+  // (floor(total/2), minimum 3) rather than always grabbing the last 10.
+  // This matters a lot at this league's current scale: with a fixed
+  // "last 10" window, anyone with 10 or fewer total results ever would have
+  // their "recent" window be literally their ENTIRE history, which forces
+  // the diff to 0 (always "Steady") every time - not a real read, just a
+  // math artifact. Scaling the window down guarantees it's always strictly
+  // smaller than the full history, so the comparison is between two
+  // genuinely different slices of data even for a build or player who's
+  // only played a handful of times so far.
+  var TREND_MIN_TOTAL_SAMPLE = 6; // need at least 6 results for a 3-vs-3 split to mean anything
+  var TREND_MAX_WINDOW = 10;
   var TREND_SWING_THRESHOLD = 0.2; // +/-20 percentage points vs all-time win rate
+
+  function winPct_(str) {
+    if (!str.length) return 0;
+    var w = 0;
+    for (var i = 0; i < str.length; i++) if (str[i] === "W") w++;
+    return w / str.length;
+  }
 
   // fullSequence: chronological "WWLWL..." string (oldest first) across the
   // entity's ENTIRE known history - builds.js already tracks this per build;
   // standings/home build the player equivalent from data.matches (see
-  // APP_RENDER.playerSequences). Passing only a last-10 string here isn't
-  // enough data to score a trend and will just fall through to null.
+  // APP_RENDER.playerSequences).
   function trendInfo(fullSequence) {
     var s = String(fullSequence || "").replace(/[^WL]/gi, "").toUpperCase();
     if (s.length < TREND_MIN_TOTAL_SAMPLE) return null;
-    var last10 = s.slice(-10);
-    if (last10.length < TREND_MIN_LAST10) return null;
-    function winPct(str) {
-      if (!str.length) return 0;
-      var w = 0;
-      for (var i = 0; i < str.length; i++) if (str[i] === "W") w++;
-      return w / str.length;
-    }
-    var overallPct = winPct(s);
-    var last10Pct = winPct(last10);
-    var diff = last10Pct - overallPct;
+    var windowSize = Math.min(TREND_MAX_WINDOW, Math.floor(s.length / 2));
+    if (windowSize < 3) return null;
+    var recent = s.slice(-windowSize);
+    var overallPct = winPct_(s);
+    var recentPct = winPct_(recent);
+    var diff = recentPct - overallPct;
     var dir, color, label;
     if (diff >= TREND_SWING_THRESHOLD) { dir = "up"; color = "var(--xtreme)"; label = "Trending up"; }
     else if (diff <= -TREND_SWING_THRESHOLD) { dir = "down"; color = "var(--spin)"; label = "Trending down"; }
     else { dir = "flat"; color = "var(--gold)"; label = "Steady"; }
-    return { dir: dir, color: color, label: label, last10: last10, last10Pct: last10Pct, overallPct: overallPct, diff: diff };
+    return { dir: dir, color: color, label: label, recent: recent, recentPct: recentPct, overallPct: overallPct, diff: diff };
   }
 
-  // Tiny inline sparkline of the cumulative win rate across the last 10
-  // games/battles - a real little trend line rather than a static arrow
-  // glyph, colored to match the up/steady/down read above.
-  function sparklineSVG_(last10, color) {
-    var n = last10.length;
+  // Tiny inline sparkline of the cumulative win rate across the recent
+  // window - a real little trend line rather than a static arrow glyph,
+  // colored to match the up/steady/down read above.
+  function sparklineSVG_(recent, color) {
+    var n = recent.length;
     if (n < 2) return "";
     var cum = 0, pts = [];
     for (var i = 0; i < n; i++) {
-      cum += last10[i] === "W" ? 1 : 0;
+      cum += recent[i] === "W" ? 1 : 0;
       pts.push(cum / (i + 1));
     }
     var w = 34, h = 14, pad = 2;
@@ -312,8 +320,8 @@
   function trendBadgeHTML(fullSequence) {
     var t = trendInfo(fullSequence);
     if (!t) return '<span style="color:var(--text-faint);">—</span>';
-    var title = t.label + " — last 10: " + Math.round(t.last10Pct * 100) + "% vs " + Math.round(t.overallPct * 100) + "% all-time";
-    return '<span title="' + U.esc(title) + '">' + sparklineSVG_(t.last10, t.color) + '</span>';
+    var title = t.label + " — last " + t.recent.length + ": " + Math.round(t.recentPct * 100) + "% vs " + Math.round(t.overallPct * 100) + "% all-time";
+    return '<span title="' + U.esc(title) + '">' + sparklineSVG_(t.recent, t.color) + '</span>';
   }
 
   // Builds a map of playerId -> full chronological "WWLWL..." match history
