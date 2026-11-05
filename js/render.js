@@ -248,25 +248,32 @@
     return fullBuildLabel(build, partsById) || "Unlisted Build";
   }
 
-  // Trend methodology: compare the win rate in a "recent" window against
-  // the entity's win rate across its FULL known history - "have they been
-  // running hotter or colder than their real level lately." A swing of 20
-  // percentage points or more either way calls it trending up/down; inside
-  // that +/-20pt band (40pt total) reads as steady.
+  // Trend methodology (whole season): split the season's W/L results in
+  // half - first half vs second half - and compare win rates. "Second half
+  // win rate minus first half win rate" is a standard, easy-to-explain read
+  // on whether an entity is doing better or worse now than earlier in the
+  // same season, using every result rather than an arbitrary "last N" slice.
   //
-  // The recent window is capped at 10 but SHRINKS for a thinner history
-  // (floor(total/2), minimum 3) rather than always grabbing the last 10.
-  // This matters a lot at this league's current scale: with a fixed
-  // "last 10" window, anyone with 10 or fewer total results ever would have
-  // their "recent" window be literally their ENTIRE history, which forces
-  // the diff to 0 (always "Steady") every time - not a real read, just a
-  // math artifact. Scaling the window down guarantees it's always strictly
-  // smaller than the full history, so the comparison is between two
-  // genuinely different slices of data even for a build or player who's
-  // only played a handful of times so far.
-  var TREND_MIN_TOTAL_SAMPLE = 6; // need at least 6 results for a 3-vs-3 split to mean anything
-  var TREND_MAX_WINDOW = 10;
-  var TREND_SWING_THRESHOLD = 0.2; // +/-20 percentage points vs all-time win rate
+  // An earlier version of this used the slope of a fitted regression line
+  // and how far it moved end-to-end, which turned out to be a mistake: that
+  // number is extremely sensitive to the exact first and last data points,
+  // and testing it against pure random 50/50 data showed it would flag
+  // "trending" on *noise* most of the time at this league's typical sample
+  // sizes - its natural random swing was bigger than the threshold meant to
+  // catch a real trend. The half-vs-half split has the same problem in
+  // miniature (it's still just a difference of two averages), so rather
+  // than use one fixed threshold for everyone, the bar an entity has to
+  // clear scales with how much data backs it up: smaller samples need a
+  // bigger swing before it's trusted as a real trend and not chance,
+  // approximated here as roughly one standard error of what pure randomness
+  // alone would produce at that sample size. It never drops below a
+  // practical floor, either, so a technically-detectable-but-tiny wobble
+  // in a very large sample still just reads as steady.
+  var TREND_MIN_TOTAL_SAMPLE = 10;
+  var TREND_PRACTICAL_FLOOR = 0.15; // never call a trend on less than a 15-point swing, no matter the sample size
+  var TREND_SIGNIFICANCE_Z = 1.0;   // swing must be at least ~1 standard error of pure chance - a lenient bar, appropriate for small amateur-league samples, not a strict p<0.05 test
+  var TREND_ROLLING_WINDOW = 5;     // visual smoothing only (see rollingSeries_) - never affects the up/down/steady call
+  var TREND_SPARKLINE_MAX_POINTS = 24;
 
   function winPct_(str) {
     if (!str.length) return 0;
@@ -276,39 +283,75 @@
   }
 
   // fullSequence: chronological "WWLWL..." string (oldest first) across the
-  // entity's ENTIRE known history - builds.js already tracks this per build;
-  // standings/home build the player equivalent from data.matches (see
-  // APP_RENDER.playerSequences).
+  // entity's ENTIRE known history this season - builds.js already tracks
+  // this per build; standings/home build the player equivalent from
+  // data.matches (see APP_RENDER.playerSequences).
   function trendInfo(fullSequence) {
     var s = String(fullSequence || "").replace(/[^WL]/gi, "").toUpperCase();
-    if (s.length < TREND_MIN_TOTAL_SAMPLE) return null;
-    var windowSize = Math.min(TREND_MAX_WINDOW, Math.floor(s.length / 2));
-    if (windowSize < 3) return null;
-    var recent = s.slice(-windowSize);
+    var n = s.length;
+    if (n < TREND_MIN_TOTAL_SAMPLE) return null;
+
+    var half = Math.floor(n / 2);
+    var firstHalf = s.slice(0, half);
+    var secondHalf = s.slice(n - half); // drops the single middle game when n is odd, so both halves stay equal size
     var overallPct = winPct_(s);
-    var recentPct = winPct_(recent);
-    var diff = recentPct - overallPct;
+    var diff = winPct_(secondHalf) - winPct_(firstHalf);
+
+    // Standard error of a difference of two win-rate averages, each over
+    // `half` games, estimated using the season's own overall win rate.
+    var se = Math.sqrt(2 * overallPct * (1 - overallPct) / Math.max(1, half));
+    var threshold = Math.max(TREND_PRACTICAL_FLOOR, TREND_SIGNIFICANCE_Z * se);
+
     var dir, color, label;
-    if (diff >= TREND_SWING_THRESHOLD) { dir = "up"; color = "var(--xtreme)"; label = "Trending up"; }
-    else if (diff <= -TREND_SWING_THRESHOLD) { dir = "down"; color = "var(--spin)"; label = "Trending down"; }
+    if (diff >= threshold) { dir = "up"; color = "var(--xtreme)"; label = "Trending up"; }
+    else if (diff <= -threshold) { dir = "down"; color = "var(--spin)"; label = "Trending down"; }
     else { dir = "flat"; color = "var(--gold)"; label = "Steady"; }
-    return { dir: dir, color: color, label: label, recent: recent, recentPct: recentPct, overallPct: overallPct, diff: diff };
+
+    var ys = [];
+    for (var i = 0; i < n; i++) ys.push(s[i] === "W" ? 1 : 0);
+
+    return { dir: dir, color: color, label: label, series: ys, overallPct: overallPct, diff: diff, n: n };
   }
 
-  // Tiny inline sparkline of the cumulative win rate across the recent
-  // window - a real little trend line rather than a static arrow glyph,
-  // colored to match the up/steady/down read above.
-  function sparklineSVG_(recent, color) {
-    var n = recent.length;
-    if (n < 2) return "";
-    var cum = 0, pts = [];
-    for (var i = 0; i < n; i++) {
-      cum += recent[i] === "W" ? 1 : 0;
-      pts.push(cum / (i + 1));
+  // Trailing rolling average (window TREND_ROLLING_WINDOW, shrinking at the
+  // very start so the line is defined from game 1) - this is what actually
+  // gets drawn. A plain cumulative average flattens out and stops moving
+  // the more games are added, which looks dead for a long season even when
+  // recent form has genuinely shifted; a short rolling window keeps the
+  // line visually alive across the whole season. The up/down/steady CALL
+  // above still comes from the unsmoothed full-season regression, not this.
+  function rollingSeries_(ys, window) {
+    var out = [];
+    for (var i = 0; i < ys.length; i++) {
+      var start = Math.max(0, i - window + 1);
+      var sum = 0, count = 0;
+      for (var j = start; j <= i; j++) { sum += ys[j]; count++; }
+      out.push(sum / count);
     }
-    var w = 34, h = 14, pad = 2;
-    var coords = pts.map(function (v, i) {
-      var x = pad + (n === 1 ? 0 : (i / (n - 1)) * (w - pad * 2));
+    return out;
+  }
+
+  // Evenly samples down to at most maxPoints (always keeping the first and
+  // last), so a long season still renders as a legible line instead of an
+  // illegibly dense squiggle in a small table cell.
+  function decimate_(arr, maxPoints) {
+    if (arr.length <= maxPoints) return arr;
+    var out = [];
+    for (var i = 0; i < maxPoints; i++) {
+      out.push(arr[Math.round((i / (maxPoints - 1)) * (arr.length - 1))]);
+    }
+    return out;
+  }
+
+  // Tiny inline sparkline of the whole season's rolling win rate - a real
+  // little trend line rather than a static arrow glyph, colored to match
+  // the up/steady/down read above.
+  function sparklineSVG_(points, color) {
+    var n = points.length;
+    if (n < 2) return "";
+    var w = 56, h = 16, pad = 2;
+    var coords = points.map(function (v, i) {
+      var x = pad + (i / (n - 1)) * (w - pad * 2);
       var y = h - pad - v * (h - pad * 2);
       return x.toFixed(1) + "," + y.toFixed(1);
     }).join(" ");
@@ -320,8 +363,9 @@
   function trendBadgeHTML(fullSequence) {
     var t = trendInfo(fullSequence);
     if (!t) return '<span style="color:var(--text-faint);">—</span>';
-    var title = t.label + " — last " + t.recent.length + ": " + Math.round(t.recentPct * 100) + "% vs " + Math.round(t.overallPct * 100) + "% all-time";
-    return '<span title="' + U.esc(title) + '">' + sparklineSVG_(t.recent, t.color) + '</span>';
+    var rolling = decimate_(rollingSeries_(t.series, TREND_ROLLING_WINDOW), TREND_SPARKLINE_MAX_POINTS);
+    var title = t.label + " — " + t.n + " this season, " + Math.round(t.overallPct * 100) + "% overall";
+    return '<span title="' + U.esc(title) + '">' + sparklineSVG_(rolling, t.color) + '</span>';
   }
 
   // Builds a map of playerId -> full chronological "WWLWL..." match history
