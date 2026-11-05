@@ -253,25 +253,23 @@
   // win rate minus first half win rate" is a standard, easy-to-explain read
   // on whether an entity is doing better or worse now than earlier in the
   // same season, using every result rather than an arbitrary "last N" slice.
+  // A swing of 20+ percentage points either way calls it trending up/down;
+  // less than that reads as steady.
   //
-  // An earlier version of this used the slope of a fitted regression line
-  // and how far it moved end-to-end, which turned out to be a mistake: that
-  // number is extremely sensitive to the exact first and last data points,
-  // and testing it against pure random 50/50 data showed it would flag
-  // "trending" on *noise* most of the time at this league's typical sample
-  // sizes - its natural random swing was bigger than the threshold meant to
-  // catch a real trend. The half-vs-half split has the same problem in
-  // miniature (it's still just a difference of two averages), so rather
-  // than use one fixed threshold for everyone, the bar an entity has to
-  // clear scales with how much data backs it up: smaller samples need a
-  // bigger swing before it's trusted as a real trend and not chance,
-  // approximated here as roughly one standard error of what pure randomness
-  // alone would produce at that sample size. It never drops below a
-  // practical floor, either, so a technically-detectable-but-tiny wobble
-  // in a very large sample still just reads as steady.
+  // This fixed 20pt bar (not scaled to sample size) is a deliberate choice.
+  // An earlier version scaled the required swing to each entity's own
+  // sample size (demanding a much bigger swing from a thin season than a
+  // long one, to control for noise) - that was the more "statistically
+  // correct" approach, but at this league's current sample sizes it made
+  // almost everything read as Steady, which wasn't useful. A single fixed
+  // threshold is simpler and more legible, and it has the property the
+  // sheet owner asked about directly: readings get MORE reliable over time
+  // without retuning anything, because a true 50/50 player's real half-to-
+  // half swing naturally shrinks as more games pile up on both sides, while
+  // the 20pt bar stays put - so early-season colors should be taken as a
+  // rough, sometimes-noisy read, and they'll firm up as the season goes on.
   var TREND_MIN_TOTAL_SAMPLE = 10;
-  var TREND_PRACTICAL_FLOOR = 0.15; // never call a trend on less than a 15-point swing, no matter the sample size
-  var TREND_SIGNIFICANCE_Z = 1.0;   // swing must be at least ~1 standard error of pure chance - a lenient bar, appropriate for small amateur-league samples, not a strict p<0.05 test
+  var TREND_SWING_THRESHOLD = 0.2;
   var TREND_ROLLING_WINDOW = 5;     // visual smoothing only (see rollingSeries_) - never affects the up/down/steady call
   var TREND_SPARKLINE_MAX_POINTS = 24;
 
@@ -297,14 +295,9 @@
     var overallPct = winPct_(s);
     var diff = winPct_(secondHalf) - winPct_(firstHalf);
 
-    // Standard error of a difference of two win-rate averages, each over
-    // `half` games, estimated using the season's own overall win rate.
-    var se = Math.sqrt(2 * overallPct * (1 - overallPct) / Math.max(1, half));
-    var threshold = Math.max(TREND_PRACTICAL_FLOOR, TREND_SIGNIFICANCE_Z * se);
-
     var dir, color, label;
-    if (diff >= threshold) { dir = "up"; color = "var(--xtreme)"; label = "Trending up"; }
-    else if (diff <= -threshold) { dir = "down"; color = "var(--spin)"; label = "Trending down"; }
+    if (diff >= TREND_SWING_THRESHOLD) { dir = "up"; color = "var(--xtreme)"; label = "Trending up"; }
+    else if (diff <= -TREND_SWING_THRESHOLD) { dir = "down"; color = "var(--spin)"; label = "Trending down"; }
     else { dir = "flat"; color = "var(--gold)"; label = "Steady"; }
 
     var ys = [];
