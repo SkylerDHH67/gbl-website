@@ -174,7 +174,7 @@
   // A build needs this many battles within the 2-session window before it's
   // eligible to be called "hot" or "cold" - otherwise a build that was tried
   // once and happened to win would misleadingly headline the home page.
-  var SPOTLIGHT_MIN_BATTLES = 3;
+  var SPOTLIGHT_MIN_BATTLES = 10;
 
   function spotlightCardHTML_(title, b, color) {
     return '<div style="flex:1;min-width:170px;">' +

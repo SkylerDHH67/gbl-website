@@ -350,6 +350,16 @@ table.data-table tbody tr{ transition: background 0.15s ease; }
 table.data-table tbody tr:hover{ background: var(--bg-elevated); }
 table.data-table tbody tr:last-child td{ border-bottom:none; }
 td.num, table.data-table th.num{ text-align:right; font-family: var(--data); }
+td.center, table.data-table th.center{ text-align:center; }
+/* Builds page has grown to 11 columns, several with long labels (Net
+   Rating, Pts/Battle, Volatility) - forcing every header onto one line
+   (the default nowrap above) was the real driver pushing the table wider
+   than a normal desktop window, not the data itself. Letting headers wrap
+   to two lines here (data cells stay single-line, untouched) plus a
+   slightly tighter padding is what actually buys back the width, rather
+   than just shortening labels and hoping. */
+table.builds-table th{ white-space: normal; line-height: 1.25; vertical-align: bottom; }
+table.builds-table th, table.builds-table td{ padding: 8px 9px; }
 .rank-cell{ font-family: var(--data); color: var(--text-faint); }
 /* Rank badge (gold pill for top 3) lives on an INNER span, never on the
    table cell itself. Putting display:inline-block + its own tight
@@ -495,15 +505,17 @@ select, input[type="text"], input[type="search"]{
 .youtube-callout .yt-title{ font-weight:700; color: var(--text); font-size:0.92rem; }
 .youtube-callout .yt-sub{ font-size:0.78rem; color: var(--text-faint); margin-top:1px; }
 
-/* minmax(0, ...) here (not a bare 2fr/1fr) is load-bearing - see the
-   .grid comment above. This is the exact grid that was overflowing on
-   mobile: the home page's second column contains a feed_standings table
+/* minmax(0, ...) here (not a bare 1fr) is load-bearing - see the .grid
+   comment above. This is the exact grid that was overflowing on mobile:
+   the home page's second column contains a feed_standings table
    (table.data-table, min-width:560px in its own .table-wrap, which is
    SUPPOSED to scroll independently), and without minmax(0,...) that
    560px minimum was propagating up through this grid and stretching the
    home page's unrelated first column (Recent Results) out past the
-   viewport edge right along with it. */
-.module-grid{ display:grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: 20px; margin: 28px 0; }
+   viewport edge right along with it. Columns are an even 1fr/1fr split -
+   an earlier 2fr/1fr version made Recent Results/Upcoming Matches read
+   oversized next to a visibly cramped Top Builds/Standings column. */
+.module-grid{ display:grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 20px; margin: 28px 0; }
 @media (max-width: 860px){ .module-grid{ grid-template-columns: minmax(0, 1fr); } }
 .result-row{ display:flex; align-items:center; justify-content:space-between; padding: 10px 0; border-bottom: 1px solid var(--line-soft); font-size: 0.9rem; transition: padding-left 0.15s ease; }
 .result-row:last-child{ border-bottom:none; }

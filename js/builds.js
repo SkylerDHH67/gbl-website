@@ -15,16 +15,19 @@
     { key: "build", label: "Build", sortable: true },
     { key: "player", label: "Player", sortable: true },
     { key: "timesUsed", label: "Used", num: true, sortable: true },
-    { key: "timesWon", label: "Won", num: true, sortable: true },
-    { key: "timesLost", label: "Lost", num: true, sortable: true },
+    // Won/Lost merged into one "W-L" column (sorts by wins) - two single-
+    // digit columns were costing a full extra header+padding's worth of
+    // width for information the Win Rate column right next to it already
+    // summarizes anyway.
+    { key: "timesWon", label: "W-L", num: true, sortable: true },
     { key: "winRate", label: "Win Rate", num: true, sortable: true },
     { key: "pointsScored", label: "Pts For", num: true, sortable: true },
     { key: "pointsAgainst", label: "Pts Against", num: true, sortable: true },
     { key: "netRating", label: "Net Rating", num: true, sortable: true },
     { key: "pointsPerBattle", label: "Pts/Battle", num: true, sortable: true },
-    { key: "form", label: "Trend", sortable: false },
-    { key: "streak", label: "Streak", sortable: false },
-    { key: "volatility", label: "Volatility Rating", num: true, sortable: true }
+    { key: "form", label: "Trend", center: true, sortable: false },
+    { key: "streak", label: "Streak", center: true, sortable: false },
+    { key: "volatility", label: "Volatility", num: true, sortable: true }
   ];
 
   // A build needs at least this many recorded uses before Volatility Rating
@@ -257,7 +260,7 @@
 
   function renderHeaderRow() {
     return "<tr>" + COLUMNS.map(function (c) {
-      var cls = (c.num ? "num " : "") + (c.sortable ? "sortable" : "");
+      var cls = (c.num ? "num " : "") + (c.center ? "center " : "") + (c.sortable ? "sortable" : "");
       var arrow = sortKey === c.key ? '<span class="sort-arrow">' + (sortDir === "asc" ? "▲" : "▼") + "</span>" : "";
       return '<th class="' + cls.trim() + '" data-sort-key="' + c.key + '">' + c.label + arrow + "</th>";
     }).join("") + "</tr>";
@@ -294,7 +297,7 @@
     var rows = sortRows(filtered);
     var colCount = COLUMNS.length;
 
-    el.innerHTML = '<div class="table-wrap"><table class="data-table"><thead>' + renderHeaderRow() + '</thead><tbody>' +
+    el.innerHTML = '<div class="table-wrap"><table class="data-table builds-table"><thead>' + renderHeaderRow() + '</thead><tbody>' +
       rows.map(function (e) {
         var img = bladeImageHTML(e.build, partsById);
         var lowSample = e.timesUsed < LOW_SAMPLE_THRESHOLD;
@@ -304,15 +307,14 @@
           '<td><span class="build-cell"><span class="sort-arrow" style="opacity:0.5;">' + (isOpen ? "▾" : "▸") + '</span>' + img + '<span style="font-family:var(--data)">' + U.esc(e.label) + '</span></span></td>' +
           '<td>' + U.esc(e.playerName) + '</td>' +
           '<td class="num"><span class="num-cell">' + sampleBadge + e.timesUsed + '</span></td>' +
-          '<td class="num"><span class="num-cell">' + e.timesWon + '</span></td>' +
-          '<td class="num"><span class="num-cell">' + e.timesLost + '</span></td>' +
+          '<td class="num"><span class="num-cell">' + e.timesWon + '-' + e.timesLost + '</span></td>' +
           '<td class="num"><span class="num-cell">' + U.pct(e.winRate) + '</span></td>' +
           '<td class="num"><span class="num-cell">' + e.pointsScored + '</span></td>' +
           '<td class="num"><span class="num-cell">' + e.pointsAgainst + '</span></td>' +
           '<td class="num"><span class="num-cell" style="color:' + R.netRatingColor(e.netRating) + ';font-weight:700;">' + e.netRating.toFixed(2) + '</span></td>' +
           '<td class="num"><span class="num-cell">' + e.pointsPerBattle.toFixed(2) + '</span></td>' +
-          '<td style="text-align:center;">' + R.trendBadgeHTML(e.last10) + '</td>' +
-          '<td style="font-family:var(--data);color:' + (e.streak.indexOf("W") !== -1 ? "var(--xtreme)" : e.streak.indexOf("L") !== -1 ? "var(--spin)" : "var(--text-faint)") + ';">' + U.esc(e.streak || "—") + '</td>' +
+          '<td class="center">' + R.trendBadgeHTML(e.last10) + '</td>' +
+          '<td class="center" style="font-family:var(--data);color:' + (e.streak.indexOf("W") !== -1 ? "var(--xtreme)" : e.streak.indexOf("L") !== -1 ? "var(--spin)" : "var(--text-faint)") + ';">' + U.esc(e.streak || "—") + '</td>' +
           '<td class="num"><span class="num-cell">' + (e.volatility === null ? '<span class="badge" title="Needs at least ' + VOLATILITY_MIN_SAMPLE + ' uses">n&lt;' + VOLATILITY_MIN_SAMPLE + '</span>' : e.volatility.toFixed(2)) + '</span></td></tr>';
         if (isOpen) {
           rowHTML += '<tr class="build-detail-row"><td colspan="' + colCount + '" style="padding:0;background:var(--bg-elevated);">' + buildDetailHTML(e) + '</td></tr>';

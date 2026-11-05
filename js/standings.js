@@ -16,7 +16,7 @@
     { key: "pointsAgainst", label: "PA", num: true, sortable: true },
     { key: "pointDiff", label: "Diff", num: true, sortable: true },
     { key: "last10", label: "Last 10", sortable: false },
-    { key: "trend", label: "Trend", sortable: false },
+    { key: "trend", label: "Trend", center: true, sortable: false },
     { key: "elo", label: "Elo", num: true, sortable: true },
     { key: "gblRating", label: "GBL Rating", num: true, sortable: true }
   ];
@@ -44,7 +44,7 @@
 
   function renderHeaderRow() {
     return "<tr>" + COLUMNS.map(function (c) {
-      var cls = (c.num ? "num " : "") + (c.sortable ? "sortable" : "");
+      var cls = (c.num ? "num " : "") + (c.center ? "center " : "") + (c.sortable ? "sortable" : "");
       var arrow = sortKey === c.key ? '<span class="sort-arrow">' + (sortDir === "asc" ? "▲" : "▼") + "</span>" : "";
       return '<th class="' + cls.trim() + '"' + (c.sortable ? ' data-sort-key="' + c.key + '"' : "") + '>' + U.esc(c.label) + arrow + "</th>";
     }).join("") + "</tr>";
@@ -73,7 +73,7 @@
           '<td>' + R.playerCellWithLogoHTML(lookup(r.playerId)) + '</td>' +
           '<td class="num">' + r.matchesPlayed + '</td><td class="num">' + r.wins + '-' + r.losses + '</td><td class="num">' + U.pct(r.winPct) + '</td>' +
           '<td class="num">' + r.pointsFor + '</td><td class="num">' + r.pointsAgainst + '</td><td class="num">' + (r.pointDiff > 0 ? "+" : "") + r.pointDiff + '</td>' +
-          '<td style="font-family:var(--data)">' + U.esc(r.last10 || "—") + '</td><td style="text-align:center;">' + R.trendBadgeHTML(r.last10) + '</td>' +
+          '<td style="font-family:var(--data)">' + U.esc(r.last10 || "—") + '</td><td class="center">' + R.trendBadgeHTML(r.last10) + '</td>' +
           '<td class="num">' + Math.round(r.elo) + '</td><td class="num">' + r.gblRating.toFixed(3) + '</td></tr>';
       }).join("") + "</tbody></table></div>";
 
